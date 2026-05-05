@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 06, 2026 at 02:03 PM
+-- Generation Time: May 05, 2026 at 02:25 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,68 @@ SET time_zone = "+00:00";
 --
 -- Database: `news_portal`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `articles`
+--
+
+CREATE TABLE `articles` (
+  `id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `content` text NOT NULL,
+  `author_id` int(11) DEFAULT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `articles`
+--
+
+INSERT INTO `articles` (`id`, `title`, `content`, `author_id`, `category_id`, `created_at`) VALUES
+(12, 'Government Announces New Policy', 'The government has introduced a new policy aimed at economic growth.', 1, 1, '2026-04-17 04:17:54'),
+(13, 'Local Team Wins Championship', 'The local football team secured a historic victory in the finals.', 1, 2, '2026-04-17 04:17:54'),
+(14, 'New Smartphone Released', 'A leading tech company has launched its latest smartphone model.', 1, 3, '2026-04-17 04:17:54'),
+(15, 'Celebrity Stars in New Movie', 'A famous actor is starring in an upcoming blockbuster film.', 1, 4, '2026-04-17 04:17:54'),
+(16, 'Election Results Declared', 'The election commission has officially announced the results.', 1, 1, '2026-04-17 04:17:54'),
+(17, 'International Match Highlights', 'An exciting cricket match kept fans on the edge of their seats.', 1, 2, '2026-04-17 04:17:54'),
+(18, 'AI Technology Advancements', 'New developments in AI are transforming industries worldwide.', 1, 3, '2026-04-17 04:17:54'),
+(19, 'Music Festival Announced', 'A major music festival will take place next month.', 1, 4, '2026-04-17 04:17:54'),
+(20, 'Parliament Session Updates', 'Key discussions were held during today’s parliament session.', 1, 1, '2026-04-17 04:17:54'),
+(21, 'Olympics Preparation Begins', 'Athletes are preparing for the upcoming Olympic games.', 1, 2, '2026-04-17 04:17:54'),
+(22, 'Cybersecurity Concerns Rise', 'Experts warn about increasing cybersecurity threats globally.', 1, 3, '2026-04-17 04:17:54'),
+(23, 'AI Technology Advancements', 'New developments in AI are changing industries worldwide.', 1, 3, '2026-05-05 12:08:45'),
+(24, 'Local Team Wins Championship', 'The local football team secured a historic victory in the finals.', 1, 2, '2026-05-05 12:10:43'),
+(25, 'International Cricket Match Highlights', 'An exciting cricket match kept fans on the edge of their seats.', 1, 2, '2026-05-05 12:10:43'),
+(26, 'Basketball League Final Results', 'The final match delivered an intense competition between both teams.', 1, 2, '2026-05-05 12:10:43'),
+(27, 'Local Team Wins Championship', 'The local football team secured a historic victory in the finals.', 1, 2, '2026-05-05 12:16:19'),
+(28, 'International Cricket Match Highlights', 'An exciting cricket match kept fans on the edge of their seats.', 1, 2, '2026-05-05 12:16:19'),
+(29, 'Basketball League Final Results', 'The final match delivered an intense competition between both teams.', 1, 2, '2026-05-05 12:16:19');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `categories`
+--
+
+CREATE TABLE `categories` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `categories`
+--
+
+INSERT INTO `categories` (`id`, `name`) VALUES
+(1, 'Politics'),
+(2, 'Sports'),
+(3, 'Technology'),
+(4, 'Entertainment'),
+(5, 'Tech'),
+(6, 'Sports');
 
 -- --------------------------------------------------------
 
@@ -41,8 +103,29 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `first_name`, `last_name`, `email`, `phone`, `address`, `country`, `password`, `role`, `created_at`) VALUES
+(1, 'Admin', 'User', 'admin@gmail.com', NULL, NULL, NULL, '123456', 'user', '2026-04-17 04:16:30');
+
+--
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `articles`
+--
+ALTER TABLE `articles`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_author` (`author_id`),
+  ADD KEY `fk_category` (`category_id`);
+
+--
+-- Indexes for table `categories`
+--
+ALTER TABLE `categories`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `users`
@@ -56,10 +139,33 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT for table `articles`
+--
+ALTER TABLE `articles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+
+--
+-- AUTO_INCREMENT for table `categories`
+--
+ALTER TABLE `categories`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `articles`
+--
+ALTER TABLE `articles`
+  ADD CONSTRAINT `fk_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
