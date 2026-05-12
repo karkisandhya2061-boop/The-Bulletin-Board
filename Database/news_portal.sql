@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 05, 2026 at 02:25 PM
+-- Generation Time: May 12, 2026 at 06:10 PM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -58,7 +58,17 @@ INSERT INTO `articles` (`id`, `title`, `content`, `author_id`, `category_id`, `c
 (26, 'Basketball League Final Results', 'The final match delivered an intense competition between both teams.', 1, 2, '2026-05-05 12:10:43'),
 (27, 'Local Team Wins Championship', 'The local football team secured a historic victory in the finals.', 1, 2, '2026-05-05 12:16:19'),
 (28, 'International Cricket Match Highlights', 'An exciting cricket match kept fans on the edge of their seats.', 1, 2, '2026-05-05 12:16:19'),
-(29, 'Basketball League Final Results', 'The final match delivered an intense competition between both teams.', 1, 2, '2026-05-05 12:16:19');
+(29, 'Basketball League Final Results', 'The final match delivered an intense competition between both teams.', 1, 2, '2026-05-05 12:16:19'),
+(30, 'Government Announces New Policy', 'The government has introduced a new national policy focused on economic development and infrastructure growth.', 1, 4, '2026-05-12 16:03:18'),
+(31, 'Parliament Session Updates', 'Important discussions were held in parliament regarding education reform and public sector investment.', 1, 4, '2026-05-12 16:03:18'),
+(32, 'Election Results Declared', 'The election commission officially announced the final election results across all constituencies.', 1, 4, '2026-05-12 16:03:18'),
+(33, 'Opposition Raises Concerns', 'Opposition leaders raised concerns regarding budget allocation and policy transparency.', 1, 4, '2026-05-12 16:03:18'),
+(34, 'Foreign Relations Meeting Held', 'Government officials held international discussions to strengthen diplomatic and trade relations.', 1, 4, '2026-05-12 16:03:18'),
+(35, 'NASA Discovers New Planet', 'Astronomers have discovered a new Earth-like planet that may support life.', 1, 5, '2026-05-12 16:06:00'),
+(36, 'Breakthrough in Cancer Research', 'Scientists have developed a promising treatment method in early-stage clinical trials.', 1, 5, '2026-05-12 16:06:00'),
+(37, 'Ocean Exploration Mission', 'Researchers have identified several unknown marine species during deep ocean exploration.', 1, 5, '2026-05-12 16:06:00'),
+(38, 'Advancements in Renewable Energy', 'Scientists are improving solar panel efficiency using new materials and technologies.', 1, 5, '2026-05-12 16:06:00'),
+(39, 'AI Supports Scientific Research', 'Artificial intelligence is helping researchers analyze complex scientific data faster.', 1, 5, '2026-05-12 16:06:00');
 
 -- --------------------------------------------------------
 
@@ -81,7 +91,9 @@ INSERT INTO `categories` (`id`, `name`) VALUES
 (3, 'Technology'),
 (4, 'Entertainment'),
 (5, 'Tech'),
-(6, 'Sports');
+(6, 'Sports'),
+(7, 'Politics'),
+(8, 'Science');
 
 -- --------------------------------------------------------
 
@@ -142,13 +154,13 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `articles`
 --
 ALTER TABLE `articles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
 
 --
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `users`
