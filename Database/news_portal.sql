@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 12, 2026 at 06:10 PM
+-- Generation Time: May 19, 2026 at 07:47 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -68,7 +68,17 @@ INSERT INTO `articles` (`id`, `title`, `content`, `author_id`, `category_id`, `c
 (36, 'Breakthrough in Cancer Research', 'Scientists have developed a promising treatment method in early-stage clinical trials.', 1, 5, '2026-05-12 16:06:00'),
 (37, 'Ocean Exploration Mission', 'Researchers have identified several unknown marine species during deep ocean exploration.', 1, 5, '2026-05-12 16:06:00'),
 (38, 'Advancements in Renewable Energy', 'Scientists are improving solar panel efficiency using new materials and technologies.', 1, 5, '2026-05-12 16:06:00'),
-(39, 'AI Supports Scientific Research', 'Artificial intelligence is helping researchers analyze complex scientific data faster.', 1, 5, '2026-05-12 16:06:00');
+(39, 'AI Supports Scientific Research', 'Artificial intelligence is helping researchers analyze complex scientific data faster.', 1, 5, '2026-05-12 16:06:00'),
+(40, 'International Film Festival Begins', 'Film directors and actors from around the world gathered for the annual international film festival.', 1, 7, '2026-05-16 05:38:21'),
+(41, 'Fashion Week Showcases New Trends', 'Designers introduced their latest fashion collections during this year’s fashion week.', 1, 7, '2026-05-16 05:38:21'),
+(42, 'Local Art Exhibition Opens', 'Artists displayed modern and traditional artwork at the city cultural center.', 1, 7, '2026-05-16 05:38:21'),
+(43, 'Music Concert Draws Huge Crowd', 'Thousands of music fans attended the live concert featuring popular performers.', 1, 7, '2026-05-16 05:38:21'),
+(44, 'Cultural Heritage Program Launched', 'The government launched a new program to preserve local cultural heritage and traditions.', 1, 7, '2026-05-16 05:38:21'),
+(45, 'Editorial: The Future of Digital Education', 'Experts discuss how digital platforms are reshaping the future of learning and education systems.', 1, 8, '2026-05-16 05:39:37'),
+(46, 'Opinion: Balancing Technology and Privacy', 'Writers debate how governments and companies should balance innovation with personal privacy rights.', 1, 8, '2026-05-16 05:39:37'),
+(47, 'Policy Analysis: Economic Reform Strategies', 'Analysts examine the long-term impact of proposed economic reforms on businesses and citizens.', 1, 8, '2026-05-16 05:39:37'),
+(48, 'Social Debate: Remote Work Culture', 'Professionals share different perspectives on the rise of remote work and workplace flexibility.', 1, 8, '2026-05-16 05:39:37'),
+(49, 'Opinion: Preparing for an AI-Driven Future', 'Industry leaders discuss how societies can adapt to rapid changes brought by artificial intelligence.', 1, 8, '2026-05-16 05:39:37');
 
 -- --------------------------------------------------------
 
@@ -93,7 +103,50 @@ INSERT INTO `categories` (`id`, `name`) VALUES
 (5, 'Tech'),
 (6, 'Sports'),
 (7, 'Politics'),
-(8, 'Science');
+(8, 'Science'),
+(9, 'Culture'),
+(10, 'Opinion');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `conversations`
+--
+
+CREATE TABLE `conversations` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `conversations`
+--
+
+INSERT INTO `conversations` (`id`, `user_id`, `created_at`) VALUES
+(1, 1, '2026-05-19 05:45:46');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `messages`
+--
+
+CREATE TABLE `messages` (
+  `id` int(11) NOT NULL,
+  `conversation_id` int(11) NOT NULL,
+  `sender` enum('user','bot') NOT NULL,
+  `message` text NOT NULL,
+  `sent_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `messages`
+--
+
+INSERT INTO `messages` (`id`, `conversation_id`, `sender`, `message`, `sent_at`) VALUES
+(1, 1, 'user', 'What are today’s top news headlines?', '2026-05-19 05:45:56'),
+(2, 1, 'bot', 'Today’s top headlines include politics, technology, and sports updates.', '2026-05-19 05:45:56');
 
 -- --------------------------------------------------------
 
@@ -140,6 +193,20 @@ ALTER TABLE `categories`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `conversations`
+--
+ALTER TABLE `conversations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `messages`
+--
+ALTER TABLE `messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `conversation_id` (`conversation_id`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
@@ -154,13 +221,25 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `articles`
 --
 ALTER TABLE `articles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
 --
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+
+--
+-- AUTO_INCREMENT for table `conversations`
+--
+ALTER TABLE `conversations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `messages`
+--
+ALTER TABLE `messages`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -178,6 +257,18 @@ ALTER TABLE `users`
 ALTER TABLE `articles`
   ADD CONSTRAINT `fk_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `fk_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
+
+--
+-- Constraints for table `conversations`
+--
+ALTER TABLE `conversations`
+  ADD CONSTRAINT `conversations_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `messages`
+--
+ALTER TABLE `messages`
+  ADD CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
