@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import NewsCard from './components/NewsCard';
+import { authService, newsService, adsService, getToken } from './utils/apiService';
 
-const tickerItems = [
+// Fallback data in case API calls fail
+const defaultTickerItems = [
   'Global Summit addresses climate crisis in urgent session...',
   'Market indices reach historic high following tech breakthrough...',
   'New archaeological discovery rewrites early trade history...',
 ];
 
-const heroStory = {
+const defaultHeroStory = {
   tag: 'World News',
   title:
     'The Architecture of the Future: How Digital Twins are Reshaping Urban Living',
@@ -16,7 +18,7 @@ const heroStory = {
   imageClass: 'hero-visual',
 };
 
-const featuredSideStories = [
+const defaultFeaturedSideStories = [
   {
     id: 1,
     category: 'Tech',
@@ -37,7 +39,7 @@ const featuredSideStories = [
   },
 ];
 
-const trendingStories = [
+const defaultTrendingStories = [
   {
     id: 1,
     category: 'Markets',
@@ -79,14 +81,6 @@ const trendingStories = [
     tag: 'Live',
   },
 ];
-
-const allowedLogin = {
-  firstName: 'sandhya',
-  lastName: 'tiwari',
-  email: 'sandhya@gmail.com',
-  password: 'password123',
-  role: 'user',
-};
 
 const loginFormDefaults = {
   firstName: '',
@@ -171,7 +165,7 @@ const demoRole = 'user';
 
 function App() {
   const [screen, setScreen] = useState('home');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [activeAuthTab, setActiveAuthTab] = useState('login');
   const [loginForm, setLoginForm] = useState(loginFormDefaults);
   const [signupForm, setSignupForm] = useState(signupFormDefaults);
@@ -181,6 +175,37 @@ function App() {
   const [clickCount, setClickCount] = useState(0);
   const [nextAdTrigger, setNextAdTrigger] = useState(() => (Math.random() < 0.5 ? 5 : 6));
   const [message, setMessage] = useState('');
+
+  // API data state
+  const [tickerItems, setTickerItems] = useState(defaultTickerItems);
+  const [heroStory, setHeroStory] = useState(defaultHeroStory);
+  const [featuredSideStories, setFeaturedSideStories] = useState(defaultFeaturedSideStories);
+  const [trendingStories, setTrendingStories] = useState(defaultTrendingStories);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch news feed on component mount
+  useEffect(() => {
+    const fetchFeed = async () => {
+      try {
+        setLoading(true);
+        const feedData = await newsService.getFeed();
+        if (feedData) {
+          if (feedData.heroStory) setHeroStory(feedData.heroStory);
+          if (feedData.featuredSideStories) setFeaturedSideStories(feedData.featuredSideStories);
+          if (feedData.trendingStories) setTrendingStories(feedData.trendingStories);
+          if (feedData.tickerItems) setTickerItems(feedData.tickerItems);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch feed, using defaults:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeed();
+  }, []);
+
+  const demoRole = 'user';
 
   const breakingText = useMemo(() => tickerItems.join('   •   '), []);
   const adminVisibleAd = useMemo(() => {
@@ -228,47 +253,56 @@ function App() {
     });
   };
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
-    const isAllowedUser =
-      loginForm.firstName === allowedLogin.firstName &&
-      loginForm.lastName === allowedLogin.lastName &&
-      loginForm.email === allowedLogin.email &&
-      loginForm.password === allowedLogin.password &&
-      loginForm.role === allowedLogin.role;
-
-    if (!isAllowedUser) {
-      setMessage('Invalid credentials. Please use the exact allowed login details.');
-      return;
+    try {
+      setMessage('Logging in...');
+      await authService.login(loginForm.email, loginForm.password);
+      setMessage('Login successful.');
+      setIsLoggedIn(true);
+      setScreen('home');
+      setShowAuthPrompt(false);
+      setLoginForm(loginFormDefaults);
+    } catch (error) {
+      setMessage(error.data?.message || error.message || 'Login failed. Please try again.');
     }
-
-    setMessage('Login successful.');
-    setIsLoggedIn(true);
-    setScreen('home');
-    setShowAuthPrompt(false);
   };
 
-  const handleAdminLogin = (event) => {
+  const handleAdminLogin = async (event) => {
     event.preventDefault();
-
-    if (adminForm.username !== 'admin' || adminForm.password !== 'admin') {
-      setMessage('Invalid admin credentials. Use admin / admin to access the admin console.');
-      return;
+    try {
+      setMessage('Logging in to admin console...');
+      await authService.adminLogin(adminForm.username, adminForm.password);
+      setMessage('Admin access granted.');
+      setIsLoggedIn(true);
+      setScreen('admin');
+      setShowAuthPrompt(false);
+      setAdminForm(adminLoginDefaults);
+    } catch (error) {
+      setMessage(error.data?.message || error.message || 'Invalid admin credentials.');
     }
-
-    setMessage('Admin access granted.');
-    setIsLoggedIn(true);
-    setScreen('admin');
-    setShowAuthPrompt(false);
   };
 
-  const handleSignup = (event) => {
+  const handleSignup = async (event) => {
     event.preventDefault();
-    setMessage('Sign up is disabled for this demo. Please use the allowed login details.');
-    setActiveAuthTab('login');
+    try {
+      setMessage('Creating account...');
+      await authService.signup({
+        firstName: signupForm.name.split(' ')[0],
+        lastName: signupForm.name.split(' ')[1] || '',
+        email: signupForm.email,
+        password: signupForm.password,
+        role: 'user',
+      });
+      setMessage('Account created successfully! You can now login.');
+      setActiveAuthTab('login');
+    } catch (error) {
+      setMessage(error.data?.message || error.message || 'Sign up failed. Please try again.');
+    }
   };
 
   const handleLogout = () => {
+    authService.logout();
     setIsLoggedIn(false);
     setScreen('auth');
     setActiveAuthTab('login');
