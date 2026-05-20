@@ -42,6 +42,8 @@ namespace WebApplication1.Middleware
 
             var queue = _windows.GetOrAdd(key, _ => new Queue<DateTime>());
 
+            bool rateLimited = false;
+
             lock (queue)
             {
                 // Evict entries outside the window
@@ -51,14 +53,21 @@ namespace WebApplication1.Middleware
                 if (queue.Count >= _maxRequests)
                 {
                     _logger.LogWarning("Rate limit hit for key {Key}", key);
-                    context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                    context.Response.ContentType = "application/json";
-                    context.Response.WriteAsync(
-                        $"{{\"message\":\"Too many requests. Please wait {_windowSeconds}s before retrying.\"}}");
-                    return;
+                    rateLimited = true;
                 }
+                else
+                {
+                    queue.Enqueue(now);
+                }
+            }
 
-                queue.Enqueue(now);
+            if (rateLimited)
+            {
+                context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsync(
+                       $"{{\"message\":\"Too many requests...\"}}");
+                return;
             }
 
             await _next(context);
