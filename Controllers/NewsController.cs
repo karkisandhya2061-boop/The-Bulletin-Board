@@ -23,8 +23,6 @@ namespace WebApplication1.Controllers
         }
 
         // ─── PUBLIC CONTENT FEED ──────────────────────────────────
-        // 3.3.2: Anonymous and authenticated users — always published only.
-        // Trending ordering: pinned first (pin_order ASC), then latest updated_at DESC.
 
         /// <summary>
         /// GET /news/feed  — Public
@@ -43,19 +41,16 @@ namespace WebApplication1.Controllers
 
             var tickers = QueryTickers(conn, "status = 'published'");
 
-            // heroStory: single item, latest published_at
             var hero = allStories
                 .Where(s => s.Bucket == "heroStory")
                 .OrderByDescending(s => s.PublishedAt)
                 .FirstOrDefault();
 
-            // featuredSideStories: latest published_at first
             var featured = allStories
                 .Where(s => s.Bucket == "featuredSideStories")
                 .OrderByDescending(s => s.PublishedAt)
                 .ToList();
 
-            // trendingStories: pinned first (pin_order ASC), then most recently updated
             var trending = allStories
                 .Where(s => s.Bucket == "trendingStories")
                 .OrderBy(s => s.IsPinned ? 0 : 1)
@@ -65,24 +60,22 @@ namespace WebApplication1.Controllers
 
             return Ok(new
             {
-                heroStory           = hero,
+                heroStory = hero,
                 featuredSideStories = featured,
-                trendingStories     = trending,
-                tickerItems         = tickers
+                trendingStories = trending,
+                tickerItems = tickers
             });
         }
 
         // ─── PUBLIC STORY ENDPOINTS ───────────────────────────────
-        // 3.3.2: Public endpoints MUST only return status=published.
 
         /// <summary>
         /// GET /news/stories  — Public
         /// Published stories only. Optional ?bucket and ?category filters.
-        /// Trending bucket applies pin_order -> updated_at ordering automatically.
         /// </summary>
         [HttpGet("stories")]
         public IActionResult GetStories(
-            [FromQuery] string? bucket   = null,
+            [FromQuery] string? bucket = null,
             [FromQuery] string? category = null)
         {
             using var conn = OpenConnection();
@@ -102,7 +95,7 @@ namespace WebApplication1.Controllers
                 parameters["@Category"] = category;
             }
 
-            string where   = string.Join(" AND ", conditions);
+            string where = string.Join(" AND ", conditions);
             string orderBy = bucket == "trendingStories"
                 ? "is_pinned DESC, pin_order ASC, updated_at DESC"
                 : "published_at DESC, created_at DESC";
@@ -120,7 +113,6 @@ namespace WebApplication1.Controllers
             using var conn = OpenConnection();
             var story = GetStoryById(conn, id);
 
-            // 3.3.2: non-published items are invisible to public callers
             if (story == null || story.Status != "published")
                 return NotFound(new { message = "Story not found." });
 
@@ -129,7 +121,7 @@ namespace WebApplication1.Controllers
 
         /// <summary>
         /// GET /news/ticker  — Public
-        /// Published ticker items only, ordered by sort_order ASC then created_at ASC.
+        /// Published ticker items only.
         /// </summary>
         [HttpGet("ticker")]
         public IActionResult GetTicker()
@@ -144,8 +136,8 @@ namespace WebApplication1.Controllers
         [Authorize(Roles = "admin")]
         [HttpGet("admin/stories")]
         public IActionResult AdminGetStories(
-            [FromQuery] string? bucket   = null,
-            [FromQuery] string? status   = null,
+            [FromQuery] string? bucket = null,
+            [FromQuery] string? status = null,
             [FromQuery] string? category = null)
         {
             using var conn = OpenConnection();
@@ -205,10 +197,10 @@ namespace WebApplication1.Controllers
             var now = DateTime.UtcNow;
             var cmd = new MySqlCommand(@"
                 INSERT INTO stories
-                    (bucket, category, title, excerpt, author, read_time_minutes,
+                    (bucket, category, title, excerpt, content, author, read_time_minutes,
                      tone, is_pinned, pin_order, status, published_at, created_at, updated_at)
                 VALUES
-                    (@Bucket, @Category, @Title, @Excerpt, @Author, @ReadTime,
+                    (@Bucket, @Category, @Title, @Excerpt, @Content, @Author, @ReadTime,
                      @Tone, @IsPinned, @PinOrder, @Status, @PublishedAt, @Now, @Now);
                 SELECT LAST_INSERT_ID();", conn);
 
@@ -240,6 +232,7 @@ namespace WebApplication1.Controllers
                     category          = @Category,
                     title             = @Title,
                     excerpt           = @Excerpt,
+                    content           = @Content,
                     author            = @Author,
                     read_time_minutes = @ReadTime,
                     tone              = @Tone,
@@ -272,26 +265,23 @@ namespace WebApplication1.Controllers
             if (existing.Bucket == "heroStory" && req.Status == "published")
                 ArchiveExistingHero(conn, excludeId: id);
 
-            var now   = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             var pubAt = req.Status == "published" ? (existing.PublishedAt ?? now) : existing.PublishedAt;
 
             var cmd = new MySqlCommand(@"
                 UPDATE stories
                 SET status = @Status, published_at = @PublishedAt, updated_at = @Now
                 WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Status",      req.Status);
+            cmd.Parameters.AddWithValue("@Status", req.Status);
             cmd.Parameters.AddWithValue("@PublishedAt", (object?)pubAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Now",         now);
-            cmd.Parameters.AddWithValue("@Id",          id);
+            cmd.Parameters.AddWithValue("@Now", now);
+            cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
 
             return Ok(GetStoryById(conn, id));
         }
 
-        /// <summary>
-        /// PATCH /news/admin/stories/{id}/pin  [admin]
-        /// Sets is_pinned and pin_order. Bumps updated_at so pin changes are reflected in ordering.
-        /// </summary>
+        /// <summary>PATCH /news/admin/stories/{id}/pin  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/stories/{id:int}/pin")]
         public IActionResult PatchStoryPin(int id, [FromBody] PatchPinRequest req)
@@ -306,8 +296,8 @@ namespace WebApplication1.Controllers
                 WHERE id = @Id", conn);
             cmd.Parameters.AddWithValue("@IsPinned", req.IsPinned);
             cmd.Parameters.AddWithValue("@PinOrder", req.PinOrder);
-            cmd.Parameters.AddWithValue("@Now",      DateTime.UtcNow);
-            cmd.Parameters.AddWithValue("@Id",       id);
+            cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow);
+            cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
 
             return Ok(GetStoryById(conn, id));
@@ -362,10 +352,10 @@ namespace WebApplication1.Controllers
                 INSERT INTO ticker_items (text, status, sort_order, created_at, updated_at)
                 VALUES (@Text, @Status, @SortOrder, @Now, @Now);
                 SELECT LAST_INSERT_ID();", conn);
-            cmd.Parameters.AddWithValue("@Text",      req.Text);
-            cmd.Parameters.AddWithValue("@Status",    req.Status);
+            cmd.Parameters.AddWithValue("@Text", req.Text);
+            cmd.Parameters.AddWithValue("@Status", req.Status);
             cmd.Parameters.AddWithValue("@SortOrder", req.SortOrder);
-            cmd.Parameters.AddWithValue("@Now",       now);
+            cmd.Parameters.AddWithValue("@Now", now);
             var newId = Convert.ToInt32(cmd.ExecuteScalar());
             return Ok(GetTickerById(conn, newId));
         }
@@ -383,11 +373,11 @@ namespace WebApplication1.Controllers
                 UPDATE ticker_items
                 SET text = @Text, status = @Status, sort_order = @SortOrder, updated_at = @Now
                 WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Text",      req.Text);
-            cmd.Parameters.AddWithValue("@Status",    req.Status);
+            cmd.Parameters.AddWithValue("@Text", req.Text);
+            cmd.Parameters.AddWithValue("@Status", req.Status);
             cmd.Parameters.AddWithValue("@SortOrder", req.SortOrder);
-            cmd.Parameters.AddWithValue("@Now",       DateTime.UtcNow);
-            cmd.Parameters.AddWithValue("@Id",        id);
+            cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow);
+            cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
             return Ok(GetTickerById(conn, id));
         }
@@ -423,7 +413,7 @@ namespace WebApplication1.Controllers
             string orderBy = "published_at DESC, created_at DESC")
         {
             var cmd = new MySqlCommand($@"
-                SELECT id, bucket, category, title, excerpt, author,
+                SELECT id, bucket, category, title, excerpt, content, author,
                        read_time_minutes, tone, is_pinned, pin_order,
                        status, published_at, created_at, updated_at
                 FROM stories
@@ -457,7 +447,7 @@ namespace WebApplication1.Controllers
         private static Story? GetStoryById(MySqlConnection conn, int id)
         {
             var cmd = new MySqlCommand(@"
-                SELECT id, bucket, category, title, excerpt, author,
+                SELECT id, bucket, category, title, excerpt, content, author,
                        read_time_minutes, tone, is_pinned, pin_order,
                        status, published_at, created_at, updated_at
                 FROM stories WHERE id = @Id", conn);
@@ -482,50 +472,52 @@ namespace WebApplication1.Controllers
                 UPDATE stories
                 SET status = 'archived', updated_at = @Now
                 WHERE bucket = 'heroStory' AND status = 'published' AND id != @ExcludeId", conn);
-            cmd.Parameters.AddWithValue("@Now",       DateTime.UtcNow);
+            cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow);
             cmd.Parameters.AddWithValue("@ExcludeId", excludeId);
             cmd.ExecuteNonQuery();
         }
 
         private static void BindStoryParams(MySqlCommand cmd, CreateStoryRequest req, DateTime now)
         {
-            cmd.Parameters.AddWithValue("@Bucket",      req.Bucket);
-            cmd.Parameters.AddWithValue("@Category",    req.Category);
-            cmd.Parameters.AddWithValue("@Title",       req.Title);
-            cmd.Parameters.AddWithValue("@Excerpt",     req.Excerpt);
-            cmd.Parameters.AddWithValue("@Author",      req.Author);
-            cmd.Parameters.AddWithValue("@ReadTime",    req.ReadTimeMinutes);
-            cmd.Parameters.AddWithValue("@Tone",        req.Tone);
-            cmd.Parameters.AddWithValue("@IsPinned",    req.IsPinned);
-            cmd.Parameters.AddWithValue("@PinOrder",    req.PinOrder);
-            cmd.Parameters.AddWithValue("@Status",      req.Status);
+            cmd.Parameters.AddWithValue("@Bucket", req.Bucket);
+            cmd.Parameters.AddWithValue("@Category", req.Category);
+            cmd.Parameters.AddWithValue("@Title", req.Title);
+            cmd.Parameters.AddWithValue("@Excerpt", req.Excerpt);
+            cmd.Parameters.AddWithValue("@Content", req.Content);
+            cmd.Parameters.AddWithValue("@Author", req.Author);
+            cmd.Parameters.AddWithValue("@ReadTime", req.ReadTimeMinutes);
+            cmd.Parameters.AddWithValue("@Tone", req.Tone);
+            cmd.Parameters.AddWithValue("@IsPinned", req.IsPinned);
+            cmd.Parameters.AddWithValue("@PinOrder", req.PinOrder);
+            cmd.Parameters.AddWithValue("@Status", req.Status);
             cmd.Parameters.AddWithValue("@PublishedAt", (object?)req.PublishedAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Now",         now);
+            cmd.Parameters.AddWithValue("@Now", now);
         }
 
         private static Story MapStory(MySqlDataReader r) => new Story
         {
-            Id              = r.GetInt32("id"),
-            Bucket          = r.GetString("bucket"),
-            Category        = r.IsDBNull(r.GetOrdinal("category"))    ? "" : r.GetString("category"),
-            Title           = r.GetString("title"),
-            Excerpt         = r.IsDBNull(r.GetOrdinal("excerpt"))     ? "" : r.GetString("excerpt"),
-            Author          = r.IsDBNull(r.GetOrdinal("author"))      ? "" : r.GetString("author"),
+            Id = r.GetInt32("id"),
+            Bucket = r.GetString("bucket"),
+            Category = r.IsDBNull(r.GetOrdinal("category")) ? "" : r.GetString("category"),
+            Title = r.GetString("title"),
+            Excerpt = r.IsDBNull(r.GetOrdinal("excerpt")) ? "" : r.GetString("excerpt"),
+            Content = r.IsDBNull(r.GetOrdinal("content")) ? "" : r.GetString("content"),
+            Author = r.IsDBNull(r.GetOrdinal("author")) ? "" : r.GetString("author"),
             ReadTimeMinutes = r.GetInt32("read_time_minutes"),
-            Tone            = r.IsDBNull(r.GetOrdinal("tone"))        ? "" : r.GetString("tone"),
-            IsPinned        = r.GetBoolean("is_pinned"),
-            PinOrder        = r.GetInt32("pin_order"),
-            Status          = r.GetString("status"),
-            PublishedAt     = r.IsDBNull(r.GetOrdinal("published_at")) ? null : r.GetDateTime("published_at"),
-            CreatedAt       = r.GetDateTime("created_at"),
-            UpdatedAt       = r.GetDateTime("updated_at"),
+            Tone = r.IsDBNull(r.GetOrdinal("tone")) ? "" : r.GetString("tone"),
+            IsPinned = r.GetBoolean("is_pinned"),
+            PinOrder = r.GetInt32("pin_order"),
+            Status = r.GetString("status"),
+            PublishedAt = r.IsDBNull(r.GetOrdinal("published_at")) ? null : r.GetDateTime("published_at"),
+            CreatedAt = r.GetDateTime("created_at"),
+            UpdatedAt = r.GetDateTime("updated_at"),
         };
 
         private static TickerItem MapTicker(MySqlDataReader r) => new TickerItem
         {
-            Id        = r.GetInt32("id"),
-            Text      = r.GetString("text"),
-            Status    = r.GetString("status"),
+            Id = r.GetInt32("id"),
+            Text = r.GetString("text"),
+            Status = r.GetString("status"),
             SortOrder = r.GetInt32("sort_order"),
             CreatedAt = r.GetDateTime("created_at"),
             UpdatedAt = r.GetDateTime("updated_at"),

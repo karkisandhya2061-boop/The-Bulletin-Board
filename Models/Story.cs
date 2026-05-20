@@ -9,6 +9,7 @@ namespace WebApplication1.Models
         public string Category { get; set; } = string.Empty;   // category / tag
         public string Title { get; set; } = string.Empty;
         public string Excerpt { get; set; } = string.Empty;    // body summary / excerpt
+        public string Content { get; set; } = string.Empty;    // full article body
         public string Author { get; set; } = string.Empty;
         public int ReadTimeMinutes { get; set; } = 1;          // estimated read time in minutes
         public string Tone { get; set; } = string.Empty;       // tone / theme token for styling
@@ -40,6 +41,7 @@ namespace WebApplication1.Models
         public string Category { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public string Excerpt { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;   // full article body
         public string Author { get; set; } = string.Empty;
         public int ReadTimeMinutes { get; set; } = 1;
         public string Tone { get; set; } = string.Empty;
