@@ -86,6 +86,13 @@ export const newsService = {
   },
 
   /**
+   * Create news article with image (admin only)
+   */
+  createNews: async (newsData) => {
+    return await post('/news/create', newsData);
+  },
+
+  /**
    * Create story (admin only)
    */
   createStory: async (storyData) => {
@@ -104,6 +111,64 @@ export const newsService = {
    */
   deleteStory: async (id) => {
     return await deleteReq(`/news/${id}`);
+  },
+
+  /**
+   * Add reaction to news article
+   */
+  addReaction: async (articleId, reactionType, userName = 'User', userId = 0) => {
+    return await post(`/news/${articleId}/reactions`, { 
+      userId, 
+      userName,
+      userName,
+      reactionType 
+    });
+  },
+
+  /**
+   * Get reactions for article
+   */
+  getReactions: async (articleId) => {
+    return await get(`/news/${articleId}/reactions`);
+  },
+
+  /**
+   * Add comment to article
+   */
+  addComment: async (articleId, commentText, userName = 'Anonymous', userId = 0) => {
+    return await post(`/news/${articleId}/comments`, {
+      userId,
+      userName,
+      commentText
+    });
+  },
+
+  /**
+   * Get comments for article
+   */
+  getComments: async (articleId) => {
+    return await get(`/news/${articleId}/comments`);
+  },
+
+  /**
+   * Get all notifications
+   */
+  getNotifications: async () => {
+    return await get('/news/notifications');
+  },
+
+  /**
+   * Get unread notification count
+   */
+  getUnreadNotificationCount: async () => {
+    return await get('/news/notifications/unread-count');
+  },
+
+  /**
+   * Mark notification as read
+   */
+  markNotificationRead: async (notificationId) => {
+    return await post(`/news/notifications/${notificationId}/read`, {});
   },
 };
 

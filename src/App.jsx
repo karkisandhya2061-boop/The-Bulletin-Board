@@ -1,6 +1,15 @@
 import { useMemo, useState, useEffect } from 'react';
 import NewsCard from './components/NewsCard';
+import NewsDetailModal from './components/NewsDetailModal';
+import Chatbot from './components/Chatbot';
+import NotificationBell from './components/NotificationBell';
 import { authService, newsService, adsService, getToken } from './utils/apiService';
+import {
+  buildSectionExperience,
+  getSectionFromHash,
+  homeSections,
+  normalizeSectionKey,
+} from './utils/sectionContent';
 
 // Fallback data in case API calls fail
 const defaultTickerItems = [
@@ -83,11 +92,8 @@ const defaultTrendingStories = [
 ];
 
 const loginFormDefaults = {
-  firstName: '',
-  lastName: '',
   email: '',
   password: '',
-  role: '',
 };
 
 const signupFormDefaults = {
@@ -162,9 +168,12 @@ const adLibrary = [
 ];
 
 const demoRole = 'user';
+const initialSectionKey = getSectionFromHash();
+const initialSectionExperience = buildSectionExperience(initialSectionKey);
 
 function App() {
   const [screen, setScreen] = useState('home');
+  const [activeSection, setActiveSection] = useState(initialSectionKey);
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [activeAuthTab, setActiveAuthTab] = useState('login');
   const [loginForm, setLoginForm] = useState(loginFormDefaults);
@@ -177,35 +186,89 @@ function App() {
   const [message, setMessage] = useState('');
 
   // API data state
-  const [tickerItems, setTickerItems] = useState(defaultTickerItems);
-  const [heroStory, setHeroStory] = useState(defaultHeroStory);
-  const [featuredSideStories, setFeaturedSideStories] = useState(defaultFeaturedSideStories);
-  const [trendingStories, setTrendingStories] = useState(defaultTrendingStories);
-  const [loading, setLoading] = useState(true);
+  const [sectionView, setSectionView] = useState(initialSectionExperience);
+  const [loading, setLoading] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
+  const [adminTab, setAdminTab] = useState('overview'); // Admin navigation state
+  const [reviewModalItem, setReviewModalItem] = useState(null); // For review modals
+  const [showBreakingNews, setShowBreakingNews] = useState(true); // Toggle breaking news visibility
+  
+  // News creation form state
+  const [newsFormData, setNewsFormData] = useState({
+    title: '',
+    excerpt: '',
+    content: '',
+    category: 'Politics',
+    location: '',
+    imageUrl: ''
+  });
+  const [newsCreating, setNewsCreating] = useState(false);
+  const [showNewsForm, setShowNewsForm] = useState(false);
 
-  // Fetch news feed on component mount
+  // Fetch section-specific content
   useEffect(() => {
-    const fetchFeed = async () => {
+    if (!window.location.hash) {
+      window.location.hash = `#/${initialSectionKey}`;
+    }
+
+    const syncSectionFromHash = () => {
+      setActiveSection(getSectionFromHash());
+    };
+
+    const handleNavigateSection = (event) => {
+      const nextSection = normalizeSectionKey(event.detail?.section);
+      setActiveSection(nextSection);
+      setSelectedNews(null);
+      window.location.hash = `#/${nextSection}`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.addEventListener('hashchange', syncSectionFromHash);
+    window.addEventListener('navigate-section', handleNavigateSection);
+
+    return () => {
+      window.removeEventListener('hashchange', syncSectionFromHash);
+      window.removeEventListener('navigate-section', handleNavigateSection);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const fallbackSection = buildSectionExperience(activeSection);
+    setSectionView(fallbackSection);
+    setSelectedNews(null);
+
+    const fetchSectionStories = async () => {
       try {
         setLoading(true);
-        const feedData = await newsService.getFeed();
-        if (feedData) {
-          if (feedData.heroStory) setHeroStory(feedData.heroStory);
-          if (feedData.featuredSideStories) setFeaturedSideStories(feedData.featuredSideStories);
-          if (feedData.trendingStories) setTrendingStories(feedData.trendingStories);
-          if (feedData.tickerItems) setTickerItems(feedData.tickerItems);
+        const stories = await newsService.getByCategory(fallbackSection.label);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (Array.isArray(stories) && stories.length > 0) {
+          setSectionView(buildSectionExperience(activeSection, stories));
         }
       } catch (error) {
-        console.warn('Failed to fetch feed, using defaults:', error);
+        console.error('[DEBUG] Failed to fetch section feed:', error);
       } finally {
-        setLoading(false);
+        if (isActive) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchFeed();
-  }, []);
+    fetchSectionStories();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeSection]);
 
   const demoRole = 'user';
+  const tickerItems = sectionView.tickerItems;
+  const liveBreakingText = sectionView.tickerItems.join('   |   ');
 
   const breakingText = useMemo(() => tickerItems.join('   •   '), []);
   const adminVisibleAd = useMemo(() => {
@@ -221,13 +284,31 @@ function App() {
     setter((previous) => ({ ...previous, [name]: value }));
   };
 
+  const handleSectionSelect = (sectionKey) => {
+    const nextSection = normalizeSectionKey(sectionKey);
+    setActiveSection(nextSection);
+    setSelectedNews(null);
+    window.location.hash = `#/${nextSection}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const openRandomAd = () => {
     const ad = adLibrary[Math.floor(Math.random() * adLibrary.length)];
     setAdModal(ad);
   };
 
-  const handleInteractiveClick = () => {
+  const handleInteractiveClick = (event) => {
     if (screen !== 'home') {
+      return;
+    }
+
+    if (
+      event.target.closest('.site-nav') ||
+      event.target.closest('.header-actions') ||
+      event.target.closest('.ticker-close-button') ||
+      event.target.closest('.chatbot-window') ||
+      event.target.closest('.chatbot-toggle')
+    ) {
       return;
     }
 
@@ -319,6 +400,190 @@ function App() {
     setAdModal(null);
   };
 
+  const openNewsDetail = (article) => {
+    setSelectedNews(article);
+  };
+
+  const closeNewsDetail = () => {
+    setSelectedNews(null);
+  };
+
+  const closeBreakingNews = () => {
+    setShowBreakingNews(false);
+  };
+
+  // Admin button handlers
+  const handleAdminNavigation = (tab) => {
+    setAdminTab(tab);
+    setMessage(`Navigating to ${tab.charAt(0).toUpperCase() + tab.slice(1)}...`);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleReviewClick = (item) => {
+    setReviewModalItem(item);
+    setMessage(`Opening review: ${item.title}`);
+  };
+
+  const closeReviewModal = () => {
+    setReviewModalItem(null);
+    setMessage('Review closed.');
+  };
+
+  const handleApproveReview = (item) => {
+    setMessage(`✓ Approved: ${item.title}`);
+    setTimeout(() => setMessage(''), 3000);
+    closeReviewModal();
+  };
+
+  const handleRejectReview = (item) => {
+    setMessage(`✗ Rejected: ${item.title}`);
+    setTimeout(() => setMessage(''), 3000);
+    closeReviewModal();
+  };
+
+  // News form handlers
+  const handleNewsFormChange = (e) => {
+    const { name, value } = e.target;
+    setNewsFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB original)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        setMessage('Image file is too large. Please select an image smaller than 5MB.');
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      
+      // Read and compress the image
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        // Compress image by reducing quality
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Calculate new dimensions (max 1200x800)
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 1200;
+          const maxHeight = 800;
+          
+          if (width > height) {
+            if (width > maxWidth) {
+              height *= maxWidth / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width *= maxHeight / height;
+              height = maxHeight;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 with compression (0.7 quality)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setNewsFormData(prev => ({ ...prev, imageUrl: compressedBase64 }));
+          setMessage(`✓ Image compressed and ready (${(compressedBase64.length / 1024 / 1024).toFixed(2)}MB)`);
+          setTimeout(() => setMessage(''), 2000);
+        };
+        img.onerror = () => {
+          setMessage('Error processing image. Please try a different image.');
+          e.target.value = '';
+        };
+        img.src = event.target?.result;
+      };
+      reader.onerror = () => {
+        setMessage('Error reading file. Please try again.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCreateNews = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!newsFormData.title.trim()) {
+      setMessage('❌ Article title is required.');
+      return;
+    }
+    if (!newsFormData.content.trim()) {
+      setMessage('❌ Article content is required.');
+      return;
+    }
+    if (!newsFormData.location.trim()) {
+      setMessage('❌ Location/place is required.');
+      return;
+    }
+    if (!newsFormData.imageUrl) {
+      setMessage('❌ Please upload an image for the article.');
+      return;
+    }
+
+    try {
+      setNewsCreating(true);
+      setMessage('Creating news article...');
+      
+      const newsPayload = {
+        title: newsFormData.title.trim(),
+        excerpt: newsFormData.excerpt.trim() || newsFormData.content.substring(0, 100),
+        content: newsFormData.content.trim(),
+        category: newsFormData.category,
+        location: newsFormData.location.trim(),
+        imageUrl: newsFormData.imageUrl
+      };
+      
+      console.log('Sending news payload, image size:', newsPayload.imageUrl.length, 'bytes');
+      
+      const response = await newsService.createNews(newsPayload);
+
+      if (response.success) {
+        setMessage('✓ News article created successfully! Refreshing feed...');
+        setTimeout(() => setMessage(''), 3000);
+        
+        // Reset form
+        setNewsFormData({
+          title: '',
+          excerpt: '',
+          content: '',
+          category: 'Politics',
+          location: '',
+          imageUrl: ''
+        });
+        setShowNewsForm(false);
+        
+        const createdSectionKey = normalizeSectionKey(newsFormData.category);
+        if (createdSectionKey === activeSection) {
+          try {
+            const stories = await newsService.getByCategory(sectionView.label);
+            if (Array.isArray(stories) && stories.length > 0) {
+              setSectionView(buildSectionExperience(activeSection, stories));
+            }
+          } catch (refreshError) {
+            console.error('Failed to refresh section after create:', refreshError);
+          }
+        }
+      } else {
+        setMessage(`❌ Failed to create article: ${response.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Create news error:', error);
+      const errorMsg = error.data?.message || error.message || 'Failed to create article';
+      setMessage(`❌ Error: ${errorMsg}`);
+    } finally {
+      setNewsCreating(false);
+    }
+  };
+
   const renderAuthPanel = () => (
     <>
       <div className="auth-panel-head">
@@ -353,34 +618,12 @@ function App() {
 
       {activeAuthTab === 'login' ? (
         <form className="auth-form" onSubmit={handleLogin}>
-          <label htmlFor="login-first-name">First Name</label>
-          <input
-            id="login-first-name"
-            name="firstName"
-            type="text"
-            placeholder="sandhya"
-            value={loginForm.firstName}
-            onChange={updateForm(setLoginForm)}
-            required
-          />
-
-          <label htmlFor="login-last-name">Last Name</label>
-          <input
-            id="login-last-name"
-            name="lastName"
-            type="text"
-            placeholder="tiwari"
-            value={loginForm.lastName}
-            onChange={updateForm(setLoginForm)}
-            required
-          />
-
           <label htmlFor="login-email">Email</label>
           <input
             id="login-email"
             name="email"
             type="email"
-            placeholder="sandhya@gmail.com"
+            placeholder="your@email.com"
             value={loginForm.email}
             onChange={updateForm(setLoginForm)}
             required
@@ -399,19 +642,6 @@ function App() {
             />
             <span className="field-link">Forgot Password?</span>
           </div>
-
-          <label htmlFor="login-role">Role</label>
-          <select
-            id="login-role"
-            name="role"
-            value={loginForm.role}
-            onChange={updateForm(setLoginForm)}
-            required
-          >
-            <option value="">Select role</option>
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
 
           <button type="submit" className="auth-button">
             Login <span aria-hidden="true">→</span>
@@ -519,14 +749,15 @@ function App() {
           </div>
 
           <nav className="site-nav" aria-label="Primary navigation">
-            <a href="#">Overview</a>
-            <a href="#">Reviews</a>
-            <a href="#">Campaigns</a>
-            <a href="#">Ads</a>
-            <a href="#">Reports</a>
+            <button type="button" className={adminTab === 'overview' ? 'admin-nav-link active' : 'admin-nav-link'} onClick={() => handleAdminNavigation('overview')}>Overview</button>
+            <button type="button" className={adminTab === 'reviews' ? 'admin-nav-link active' : 'admin-nav-link'} onClick={() => handleAdminNavigation('reviews')}>Reviews</button>
+            <button type="button" className={adminTab === 'campaigns' ? 'admin-nav-link active' : 'admin-nav-link'} onClick={() => handleAdminNavigation('campaigns')}>Campaigns</button>
+            <button type="button" className={adminTab === 'ads' ? 'admin-nav-link active' : 'admin-nav-link'} onClick={() => handleAdminNavigation('ads')}>Ads</button>
+            <button type="button" className={adminTab === 'reports' ? 'admin-nav-link active' : 'admin-nav-link'} onClick={() => handleAdminNavigation('reports')}>Reports</button>
           </nav>
 
           <div className="header-actions">
+            <NotificationBell />
             <span className="admin-badge">Admin Console</span>
             <button type="button" className="logout-button" onClick={handleLogout}>
               Logout
@@ -569,43 +800,291 @@ function App() {
           </section>
 
           <section className="admin-grid">
-            <article className="admin-panel admin-panel-large">
-              <div className="section-title-row">
-                <h3>Editorial Queue</h3>
-                <span className="section-rule" />
-              </div>
+            {adminTab === 'overview' && (
+              <>
+                <article className="admin-panel admin-panel-large">
+                  <div className="section-title-row">
+                    <h3>Editorial Queue</h3>
+                    <span className="section-rule" />
+                  </div>
 
-              <div className="admin-list">
-                {adminQueue.map((item) => (
-                  <div key={item.id} className="admin-list-item">
-                    <div>
-                      <h4>{item.title}</h4>
-                      <p>{item.meta}</p>
-                    </div>
-                    <button type="button" className="admin-action-button">
-                      Review
+                  <div className="admin-list">
+                    {adminQueue.map((item) => (
+                      <div key={item.id} className="admin-list-item">
+                        <div>
+                          <h4>{item.title}</h4>
+                          <p>{item.meta}</p>
+                        </div>
+                        <button type="button" className="admin-action-button" onClick={() => handleReviewClick(item)}>
+                          Review
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="admin-panel">
+                  <div className="section-title-row">
+                    <h3>Ad Rotation</h3>
+                    <span className="section-rule" />
+                  </div>
+
+                  <div className="admin-copy-stack">
+                    <p>
+                      Random ad cards are triggered at a 5 or 6 click interval to mimic an editorial sponsorship flow.
+                    </p>
+                    <button type="button" className="auth-button auth-button-admin" onClick={openRandomAd}>
+                      Preview Ad Placement <span aria-hidden="true">→</span>
                     </button>
                   </div>
-                ))}
-              </div>
-            </article>
+                </article>
+              </>
+            )}
 
-            <article className="admin-panel">
-              <div className="section-title-row">
-                <h3>Ad Rotation</h3>
-                <span className="section-rule" />
-              </div>
+            {adminTab === 'reviews' && (
+              <article className="admin-panel admin-panel-large">
+                <div className="section-title-row">
+                  <h3>Editorial Reviews</h3>
+                  <span className="section-rule" />
+                </div>
+                <div className="admin-list">
+                  {adminQueue.map((item) => (
+                    <div key={item.id} className="admin-list-item">
+                      <div>
+                        <h4>{item.title}</h4>
+                        <p>{item.meta}</p>
+                      </div>
+                      <button type="button" className="admin-action-button" onClick={() => handleReviewClick(item)}>
+                        Review
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )}
 
-              <div className="admin-copy-stack">
-                <p>
-                  Random ad cards are triggered at a 5 or 6 click interval to mimic an editorial sponsorship flow.
-                </p>
-                <button type="button" className="auth-button auth-button-admin" onClick={openRandomAd}>
-                  Preview Ad Placement <span aria-hidden="true">→</span>
+            {adminTab === 'campaigns' && (
+              <article className="admin-panel admin-panel-large">
+                <div className="section-title-row">
+                  <h3>Add News for Users</h3>
+                  <span className="section-rule" />
+                </div>
+                
+                <button 
+                  type="button" 
+                  className="auth-button auth-button-admin"
+                  onClick={() => setShowNewsForm(!showNewsForm)}
+                  style={{ marginBottom: '1.5rem' }}
+                >
+                  {showNewsForm ? '✕ Cancel' : '+ Add New Article'} <span aria-hidden="true">→</span>
                 </button>
-              </div>
-            </article>
+
+                {showNewsForm && (
+                  <form onSubmit={handleCreateNews} className="news-creation-form">
+                    <div className="form-group">
+                      <label htmlFor="news-title">Article Title *</label>
+                      <input
+                        id="news-title"
+                        type="text"
+                        name="title"
+                        placeholder="Enter article title"
+                        value={newsFormData.title}
+                        onChange={handleNewsFormChange}
+                        required
+                        disabled={newsCreating}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="news-excerpt">Excerpt (Optional)</label>
+                      <textarea
+                        id="news-excerpt"
+                        name="excerpt"
+                        placeholder="Brief summary of the article"
+                        value={newsFormData.excerpt}
+                        onChange={handleNewsFormChange}
+                        rows="2"
+                        disabled={newsCreating}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="news-content">Article Content *</label>
+                      <textarea
+                        id="news-content"
+                        name="content"
+                        placeholder="Full article content"
+                        value={newsFormData.content}
+                        onChange={handleNewsFormChange}
+                        rows="6"
+                        required
+                        disabled={newsCreating}
+                      />
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="news-category">Category</label>
+                        <select
+                          id="news-category"
+                          name="category"
+                          value={newsFormData.category}
+                          onChange={handleNewsFormChange}
+                          disabled={newsCreating}
+                        >
+                          <option>Politics</option>
+                          <option>Tech</option>
+                          <option>Science</option>
+                          <option>Culture</option>
+                          <option>Opinion</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="news-location">Location/Place *</label>
+                        <input
+                          id="news-location"
+                          type="text"
+                          name="location"
+                          placeholder="e.g., New York, India, Tech Hub"
+                          value={newsFormData.location}
+                          onChange={handleNewsFormChange}
+                          required
+                          disabled={newsCreating}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="news-image">Upload Image * (Max 5MB, auto-compressed)</label>
+                      <input
+                        id="news-image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={newsCreating}
+                        required
+                      />
+                      {newsFormData.imageUrl && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <small style={{ color: '#10b981' }}>✓ Image ready for upload</small>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                      <button 
+                        type="submit" 
+                        className="auth-button auth-button-admin"
+                        disabled={newsCreating}
+                      >
+                        {newsCreating ? 'Creating...' : 'Create Article'} <span aria-hidden="true">→</span>
+                      </button>
+                      <button 
+                        type="button" 
+                        className="admin-dismiss-button"
+                        onClick={() => setShowNewsForm(false)}
+                        disabled={newsCreating}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {!showNewsForm && (
+                  <div className="admin-copy-stack">
+                    <p>Add new articles that will appear in the user section immediately.</p>
+                    <p style={{ fontSize: '0.9rem', color: '#666' }}>Fill out the form to create a new news article with an image and location details.</p>
+                  </div>
+                )}
+              </article>
+            )}
+
+            {adminTab === 'ads' && (
+              <article className="admin-panel admin-panel-large">
+                <div className="section-title-row">
+                  <h3>Ad Management</h3>
+                  <span className="section-rule" />
+                </div>
+                <div className="admin-copy-stack">
+                  <p>Manage all advertising placements and rotations.</p>
+                  <button type="button" className="auth-button auth-button-admin" onClick={openRandomAd}>
+                    Preview Ad Placement <span aria-hidden="true">→</span>
+                  </button>
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <p style={{ color: '#999', fontSize: '0.9rem' }}>Ad analytics and performance metrics will be displayed here.</p>
+                  </div>
+                </div>
+              </article>
+            )}
+
+            {adminTab === 'reports' && (
+              <article className="admin-panel admin-panel-large">
+                <div className="section-title-row">
+                  <h3>Analytics & Reports</h3>
+                  <span className="section-rule" />
+                </div>
+                <div className="admin-copy-stack">
+                  <p>Homepage CTR: 4.8%</p>
+                  <p>Pending Reviews: 18</p>
+                  <p>Active Campaigns: 7</p>
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <p style={{ color: '#999', fontSize: '0.9rem' }}>Detailed analytics charts and reports will be displayed here.</p>
+                  </div>
+                </div>
+              </article>
+            )}
           </section>
+
+          {message && (
+            <div className="admin-message-toast">
+              {message}
+            </div>
+          )}
+
+          {reviewModalItem && (
+            <div className="review-modal-backdrop" role="presentation" onClick={closeReviewModal}>
+              <article className="review-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="review-modal-close" onClick={closeReviewModal} aria-label="Close review">×</button>
+                <h2>{reviewModalItem.title}</h2>
+                <p className="review-meta">{reviewModalItem.meta}</p>
+                <div className="review-content">
+                  <p>This item is pending your editorial review. You can approve or reject it below.</p>
+                  <details className="review-details">
+                    <summary>View Details</summary>
+                    <pre>{JSON.stringify(reviewModalItem, null, 2)}</pre>
+                  </details>
+                </div>
+                <div className="review-actions">
+                  <button type="button" className="btn-approve" onClick={() => handleApproveReview(reviewModalItem)}>
+                    ✓ Approve
+                  </button>
+                  <button type="button" className="btn-reject" onClick={() => handleRejectReview(reviewModalItem)}>
+                    ✗ Reject
+                  </button>
+                </div>
+              </article>
+            </div>
+          )}
+
+          {adModal && (
+            <div className="ad-modal-backdrop" role="presentation" onClick={closeAdModal}>
+              <article className={`ad-modal tone-${adModal.tone}`} role="dialog" aria-modal="true" aria-label={adModal.title} onClick={(event) => event.stopPropagation()}>
+                <span className="news-card-tag">{adModal.label}</span>
+                <h3>{adModal.title}</h3>
+                <p>{adModal.copy}</p>
+                <div className="ad-modal-actions">
+                  <button type="button" className="auth-button auth-button-admin" onClick={closeAdModal}>
+                    {adModal.cta}
+                  </button>
+                  <button type="button" className="admin-dismiss-button" onClick={closeAdModal}>
+                    Dismiss
+                  </button>
+                </div>
+              </article>
+            </div>
+          )}
         </main>
 
       </div>
@@ -620,11 +1099,20 @@ function App() {
         </div>
 
         <nav className="site-nav" aria-label="Primary navigation">
-          <a href="#">Politics</a>
-          <a href="#">Tech</a>
-          <a href="#">Science</a>
-          <a href="#">Culture</a>
-          <a href="#">Opinion</a>
+          {homeSections.map((section) => (
+            <a
+              key={section.key}
+              href={`#/${section.key}`}
+              className={activeSection === section.key ? 'active' : ''}
+              aria-current={activeSection === section.key ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                handleSectionSelect(section.key);
+              }}
+            >
+              {section.label}
+            </a>
+          ))}
         </nav>
 
         <div className="header-actions">
@@ -647,28 +1135,71 @@ function App() {
         </div>
       </header>
 
-      <div className="ticker-bar" aria-label="Breaking news ticker">
-        <span className="breaking-label">BREAKING</span>
-        <div className="ticker-track">
-          <div className="ticker-text">{breakingText}</div>
+      {showBreakingNews && (
+        <div className="ticker-bar" aria-label="Breaking news ticker">
+          <span className="breaking-label">BREAKING</span>
+          <div className="ticker-track">
+            <div className="ticker-text">{liveBreakingText}</div>
+          </div>
+          <button 
+            type="button" 
+            className="ticker-close-button" 
+            onClick={closeBreakingNews}
+            aria-label="Close breaking news"
+          >
+            ×
+          </button>
         </div>
-      </div>
+      )}
 
       <main className="home-content">
+        <section className={`section-brief section-brief-${activeSection}`}>
+          <div>
+            <span className="section-brief-kicker">{sectionView.kicker}</span>
+            <p>{sectionView.description}</p>
+          </div>
+          <span className="section-brief-status">
+            {loading ? `Refreshing ${sectionView.label}...` : `${sectionView.label} desk live`}
+          </span>
+        </section>
+
         <section className="hero-layout">
-          <article className="hero-story">
+          <article
+            className={`hero-story ${sectionView.heroClass}`}
+            onClick={() => openNewsDetail(sectionView.heroStory)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openNewsDetail(sectionView.heroStory);
+              }
+            }}
+          >
             <div className="hero-overlay" />
-            <div className="hero-tag">WORLD NEWS</div>
-            <h2>{heroStory.title}</h2>
+            <div className="hero-tag">{sectionView.heroStory.tag}</div>
+            <h2>{sectionView.heroStory.title}</h2>
             <div className="hero-meta">
-              <span>{heroStory.author}</span>
-              <span>{heroStory.readTime}</span>
+              <span>{sectionView.heroStory.author}</span>
+              <span>{sectionView.heroStory.readTime || sectionView.heroStory.time}</span>
             </div>
           </article>
 
           <div className="side-stack">
-            {featuredSideStories.map((story) => (
-              <article key={story.id} className="side-story-card">
+            {sectionView.featuredSideStories.map((story) => (
+              <article
+                key={story.id}
+                className="side-story-card"
+                onClick={() => openNewsDetail(story)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openNewsDetail(story);
+                  }
+                }}
+              >
                 <div className="side-story-text">
                   <span className="card-category">{story.category}</span>
                   <h3>{story.title}</h3>
@@ -683,13 +1214,13 @@ function App() {
         </section>
 
         <section className="section-title-row">
-          <h3>Trending Now</h3>
+          <h3>{`Trending in ${sectionView.label}`}</h3>
           <span className="section-rule" />
         </section>
 
         <section className="trending-grid">
-          {trendingStories.map((story) => (
-            <NewsCard key={story.id} article={story} />
+          {sectionView.trendingStories.map((story) => (
+            <NewsCard key={story.id} article={story} onClick={openNewsDetail} />
           ))}
         </section>
       </main>
@@ -729,6 +1260,9 @@ function App() {
           </article>
         </div>
       ) : null}
+
+      {selectedNews && <NewsDetailModal article={selectedNews} onClose={closeNewsDetail} />}
+      <Chatbot />
     </div>
   );
 }
