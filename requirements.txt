@@ -1,0 +1,445 @@
+PROJECT BACKEND REQUIREMENTS (.NET) - NEWS PORTAL
+Version: 1.0
+Date: 2026-04-13
+Scope: Backend requirements for the current frontend project (React + Vite) in this repository.
+
+================================================================================
+1. OBJECTIVE
+================================================================================
+Build a production-ready .NET backend API that supports:
+- User authentication and role-based authorization (user/admin).
+- News content management for hero, featured, and trending sections.
+- Admin dashboard metrics and editorial review queue.
+- Ad library and randomized ad trigger flow compatible with frontend behavior.
+- Session handling, secure credential storage, and auditability.
+
+Current frontend behavior summary that backend must support:
+- Login form includes: firstName, lastName, email, password, role.
+- Separate admin login form currently uses username + password.
+- Home screen shows hero story, side featured stories, and trending list.
+- Random ad modal appears after 5 or 6 user interactions when logged in.
+- Admin screen includes dashboard highlights, review queue, and ad preview.
+
+================================================================================
+2. TECHNOLOGY STACK REQUIREMENTS
+================================================================================
+2.1 Runtime and Framework
+- .NET 8 (LTS) required.
+- ASP.NET Core Web API required.
+- C# 12 required.
+
+2.2 Data Access
+- Entity Framework Core 8 required.
+- Code-first migrations required.
+- Database provider: SQL Server (primary).
+- Optional local development provider: SQLite (allowed only for dev profile).
+
+2.3 Authentication and Security
+- JWT Bearer authentication required for API access.
+- Refresh token flow required for long-lived sessions.
+- BCrypt/Argon2 password hashing required (never plain text).
+- Role claims required in JWT: user, admin.
+
+2.4 API Documentation and Tooling
+- OpenAPI/Swagger required for all environments except production by default.
+- Postman collection export required.
+- Structured logging required (Serilog or built-in with JSON output).
+
+2.5 Project Structure (recommended)
+- /src/Portal.Api
+- /src/Portal.Application
+- /src/Portal.Domain
+- /src/Portal.Infrastructure
+- /tests/Portal.Api.Tests
+- /tests/Portal.Application.Tests
+
+================================================================================
+3. FUNCTIONAL REQUIREMENTS
+================================================================================
+3.1 Authentication Module
+3.1.1 User Login
+- Endpoint must accept:
+  - firstName (string, required)
+  - lastName (string, required)
+  - email (string, required)
+  - password (string, required)
+  - role (enum: user|admin, required)
+- Backend must validate credential correctness and selected role compatibility.
+- On success, backend returns:
+  - accessToken
+  - refreshToken
+  - expiresInSeconds
+  - user profile summary
+- On failure, backend returns safe error (no credential leak).
+
+3.1.2 Admin Login
+- Endpoint must accept either:
+  - username + password
+  OR
+  - email + password
+- Result must include admin role in claims.
+- Only users with role admin can access admin endpoints.
+
+3.1.3 Signup / Registration
+- Frontend currently disables signup in UI, but backend must still provide:
+  - registration endpoint for future enablement.
+- Required fields:
+  - fullName
+  - email
+  - password
+- Backend must reject weak passwords and duplicate email.
+- Default role for signup: user.
+
+3.1.4 Logout and Token Revocation
+- Logout endpoint must revoke refresh token.
+- Access token blacklist strategy optional, refresh token revocation mandatory.
+- Session metadata (device/ip/issuedAt) should be retained for audit.
+
+3.2 User and Role Management
+- Roles required: user, admin.
+- Admin-only endpoints to:
+  - list users
+  - update user role
+  - deactivate user
+- Users can view/update only their own profile unless admin.
+
+3.3 News Content Module
+3.3.1 Content Types
+- Support content buckets:
+  - heroStory (single active item)
+  - featuredSideStories (multiple)
+  - trendingStories (multiple)
+  - tickerItems (multiple text entries)
+- Each story supports:
+  - id
+  - category/tag
+  - title
+  - excerpt/body summary
+  - author
+  - readTime/time
+  - tone/theme token
+  - status (draft/published/archived)
+  - publishedAt
+  - createdAt/updatedAt
+
+3.3.2 Public Retrieval
+- Anonymous and authenticated users can fetch published content.
+- Public endpoints must only return status=published.
+- API response ordering:
+  - trending by pinned order then latest update.
+
+3.3.3 Admin Editorial Operations
+- Admin can create/update/delete stories.
+- Admin can publish/unpublish stories.
+- Admin can reorder featured and trending cards.
+- Admin can update ticker stream entries.
+
+3.4 Admin Dashboard Module
+3.4.1 Highlights
+- API must provide metrics for admin cards:
+  - pending reviews count
+  - active campaigns count
+  - homepage CTR value
+- Metrics can be computed or seeded for MVP.
+
+3.4.2 Editorial Queue
+- Queue item fields:
+  - id
+  - title
+  - meta/details
+  - priority
+  - dueAt
+  - status (pending/inReview/completed)
+  - assignedTo (optional)
+- Admin can list, create, update, mark complete.
+
+3.5 Ads and Interaction Rules
+3.5.1 Ad Library
+- Ad entity fields:
+  - id
+  - label
+  - title
+  - copy
+  - cta
+  - tone
+  - isActive
+  - startAt/endAt
+  - createdAt/updatedAt
+
+3.5.2 Ad Rotation Endpoint
+- Provide endpoint returning one random active ad.
+- Must support deterministic mode for testing via optional seed parameter.
+
+3.5.3 Click Trigger Compatibility
+- Frontend currently triggers ad every 5 or 6 interactions.
+- Backend requirement:
+  - optional endpoint to register interaction events per session/user.
+  - optional endpoint to ask if ad should display (returns boolean + ad payload if true).
+- If this rule is moved server-side, backend must preserve behavior:
+  - threshold randomly selected from {5,6}.
+  - reset counter after ad shown.
+
+================================================================================
+4. NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+4.1 Performance
+- p95 read endpoints < 300 ms under normal load.
+- p95 write endpoints < 500 ms.
+- Support 200 concurrent users for MVP baseline.
+
+4.2 Scalability
+- API must be stateless (except refresh token persistence).
+- Horizontal scaling compatible.
+- Distributed cache (Redis) recommended for sessions/rate-limit in production.
+
+4.3 Reliability
+- Health check endpoints required:
+  - /health/live
+  - /health/ready
+- Graceful startup/shutdown required.
+- Retry strategy for transient DB errors required.
+
+4.4 Security
+- HTTPS required in production.
+- CORS restricted to allowed frontend origins.
+- Input validation on all DTOs.
+- SQL injection protection via parameterized EF queries.
+- XSS-safe response practices and strict content types.
+- Rate limiting for auth endpoints required.
+- Account lockout policy required after repeated failed logins.
+
+4.5 Observability
+- Correlation ID per request required.
+- Structured logs required with level and context.
+- Audit log required for:
+  - login success/failure
+  - role changes
+  - content publish/unpublish
+  - ad config changes
+
+================================================================================
+5. DATA MODEL REQUIREMENTS
+================================================================================
+5.1 Core Entities
+- User
+- Role
+- UserRole (if many-to-many model used)
+- RefreshToken
+- NewsStory
+- TickerItem
+- EditorialQueueItem
+- DashboardMetricSnapshot (optional)
+- AdCampaign
+- InteractionEvent (optional for server-side ad trigger)
+- AuditLog
+
+5.2 Required User Fields
+- Id (GUID)
+- FirstName
+- LastName
+- FullName (optional derived)
+- Username (optional for admin login compatibility)
+- Email (unique)
+- PasswordHash
+- IsActive
+- CreatedAt
+- UpdatedAt
+- LastLoginAt
+
+5.3 Required Constraints
+- Unique index on User.Email.
+- Optional unique index on User.Username.
+- Non-null Title for all content records.
+- Enforced enum-like constraints for role/status/tone where feasible.
+
+================================================================================
+6. API REQUIREMENTS (MINIMUM CONTRACT)
+================================================================================
+6.1 Auth
+- POST /api/v1/auth/login
+- POST /api/v1/auth/admin-login
+- POST /api/v1/auth/register
+- POST /api/v1/auth/refresh
+- POST /api/v1/auth/logout
+- GET  /api/v1/auth/me
+
+6.2 Public Content
+- GET /api/v1/content/home
+  - returns hero, featured, trending, ticker in one payload.
+- GET /api/v1/content/trending
+- GET /api/v1/content/featured
+- GET /api/v1/content/ticker
+
+6.3 Admin Content
+- POST   /api/v1/admin/content/stories
+- PUT    /api/v1/admin/content/stories/{id}
+- DELETE /api/v1/admin/content/stories/{id}
+- PATCH  /api/v1/admin/content/stories/{id}/publish
+- PATCH  /api/v1/admin/content/stories/{id}/unpublish
+- PUT    /api/v1/admin/content/orders
+
+6.4 Admin Queue + Metrics
+- GET    /api/v1/admin/dashboard/highlights
+- GET    /api/v1/admin/queue
+- POST   /api/v1/admin/queue
+- PUT    /api/v1/admin/queue/{id}
+- PATCH  /api/v1/admin/queue/{id}/complete
+
+6.5 Ads
+- GET    /api/v1/ads/random
+- GET    /api/v1/admin/ads
+- POST   /api/v1/admin/ads
+- PUT    /api/v1/admin/ads/{id}
+- DELETE /api/v1/admin/ads/{id}
+
+6.6 Optional Interaction Tracking
+- POST /api/v1/interactions/click
+- GET  /api/v1/interactions/ad-decision
+
+================================================================================
+7. VALIDATION AND ERROR HANDLING
+================================================================================
+- Use FluentValidation or equivalent for DTO validation.
+- Standard error envelope required:
+  - code
+  - message
+  - details (optional)
+  - traceId
+- HTTP status expectations:
+  - 200/201 success
+  - 400 validation failure
+  - 401 unauthenticated
+  - 403 unauthorized
+  - 404 not found
+  - 409 conflict (duplicate)
+  - 429 rate limited
+  - 500 server error
+
+================================================================================
+8. CONFIGURATION REQUIREMENTS
+================================================================================
+8.1 Environment Profiles
+- appsettings.json (base)
+- appsettings.Development.json
+- appsettings.Staging.json
+- appsettings.Production.json
+
+8.2 Required Settings
+- ConnectionStrings:DefaultConnection
+- Jwt:Issuer
+- Jwt:Audience
+- Jwt:SigningKey
+- Jwt:AccessTokenMinutes
+- Jwt:RefreshTokenDays
+- Cors:AllowedOrigins
+- RateLimit:AuthRequestsPerMinute
+- Logging:LogLevel
+
+8.3 Secrets
+- Production secrets must come from secure secret store or environment vars.
+- No secrets committed to source control.
+
+================================================================================
+9. TESTING REQUIREMENTS
+================================================================================
+9.1 Unit Tests
+- Service-level tests for auth, role checks, content service, ad selection logic.
+- Minimum 80% coverage on business logic layer.
+
+9.2 Integration Tests
+- Test authentication flow end-to-end.
+- Test role-protected endpoint access.
+- Test content CRUD and publish workflow.
+- Test random ad endpoint behavior with deterministic seed.
+
+9.3 Contract Tests
+- Validate response schema for /content/home and auth endpoints.
+
+9.4 Security Tests
+- Brute-force protection verification for login.
+- JWT tampering test.
+- Authorization bypass attempts for admin endpoints.
+
+================================================================================
+10. DEVOPS AND DEPLOYMENT REQUIREMENTS
+================================================================================
+10.1 Containerization
+- Dockerfile required for API service.
+- docker-compose for local API + DB setup recommended.
+
+10.2 CI/CD
+- Pipeline must run:
+  - restore
+  - build
+  - test
+  - migration script validation
+- Block deploy on failing tests.
+
+10.3 Database Migration Workflow
+- EF migration scripts versioned in repository.
+- Auto-migrate in development allowed.
+- Production migration must be explicit/controlled.
+
+================================================================================
+11. SEED DATA REQUIREMENTS FOR MVP
+================================================================================
+- Seed one admin account.
+- Seed one normal user account.
+- Seed homepage content:
+  - 1 hero story
+  - 2 featured side stories
+  - 4 trending stories
+  - 3 ticker items
+- Seed admin dashboard examples:
+  - 3 highlight cards
+  - 3 editorial queue items
+- Seed 3 ad library records.
+
+Note: Credentials in seed must be hashed and configurable through env variables.
+
+================================================================================
+12. FRONTEND INTEGRATION NOTES
+================================================================================
+- Frontend currently stores demo data locally; backend must expose equivalent payload shapes.
+- API should support gradual migration:
+  - start with GET /content/home payload matching existing UI sections.
+  - then replace local auth with JWT flow.
+- CORS must include Vite dev origin (for local development).
+
+================================================================================
+13. ACCEPTANCE CRITERIA (MVP)
+================================================================================
+- User can login and receive JWT + refresh token.
+- Admin can login and access admin-only APIs.
+- Homepage data is fetched from backend and renders all sections.
+- Admin can manage stories, queue items, and ads.
+- Random ad endpoint serves active ad content.
+- Unauthorized admin access attempts are blocked with 403.
+- All required tests pass in CI.
+- Basic audit logs are stored for critical actions.
+
+================================================================================
+14. OUT OF SCOPE (CURRENT MVP)
+================================================================================
+- Payment/subscription billing integration.
+- Multi-language content localization.
+- Real-time websocket updates.
+- Recommendation engine personalization.
+
+================================================================================
+15. IMPLEMENTATION PRIORITY
+================================================================================
+Phase 1:
+- Auth + role model + JWT/refresh + user/admin login.
+- /content/home read endpoint with seeded data.
+
+Phase 2:
+- Admin content CRUD + publish workflow + queue.
+
+Phase 3:
+- Ads management + random ad endpoint + optional interaction tracking.
+
+Phase 4:
+- Hardening: rate limits, audit logs, dashboards, performance tuning.
+
+END OF REQUIREMENTS
