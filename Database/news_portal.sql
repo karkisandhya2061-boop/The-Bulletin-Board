@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 19, 2026 at 07:47 AM
+-- Generation Time: May 21, 2026 at 08:35 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -78,7 +78,8 @@ INSERT INTO `articles` (`id`, `title`, `content`, `author_id`, `category_id`, `c
 (46, 'Opinion: Balancing Technology and Privacy', 'Writers debate how governments and companies should balance innovation with personal privacy rights.', 1, 8, '2026-05-16 05:39:37'),
 (47, 'Policy Analysis: Economic Reform Strategies', 'Analysts examine the long-term impact of proposed economic reforms on businesses and citizens.', 1, 8, '2026-05-16 05:39:37'),
 (48, 'Social Debate: Remote Work Culture', 'Professionals share different perspectives on the rise of remote work and workplace flexibility.', 1, 8, '2026-05-16 05:39:37'),
-(49, 'Opinion: Preparing for an AI-Driven Future', 'Industry leaders discuss how societies can adapt to rapid changes brought by artificial intelligence.', 1, 8, '2026-05-16 05:39:37');
+(49, 'Opinion: Preparing for an AI-Driven Future', 'Industry leaders discuss how societies can adapt to rapid changes brought by artificial intelligence.', 1, 8, '2026-05-16 05:39:37'),
+(50, 'Test Article', 'Testing article insertion.', 1, 2, '2026-05-21 06:33:49');
 
 -- --------------------------------------------------------
 
@@ -172,7 +173,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `first_name`, `last_name`, `email`, `phone`, `address`, `country`, `password`, `role`, `created_at`) VALUES
-(1, 'Admin', 'User', 'admin@gmail.com', NULL, NULL, NULL, '123456', 'user', '2026-04-17 04:16:30');
+(1, 'Admin', 'User', 'admin@gmail.com', NULL, NULL, NULL, '123456', 'user', '2026-04-17 04:16:30'),
+(2, 'Test', 'User', 'test@gmail.com', NULL, NULL, NULL, 'test123', 'user', '2026-05-21 06:33:33');
 
 --
 -- Indexes for dumped tables
@@ -184,7 +186,10 @@ INSERT INTO `users` (`id`, `first_name`, `last_name`, `email`, `phone`, `address
 ALTER TABLE `articles`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_author` (`author_id`),
-  ADD KEY `fk_category` (`category_id`);
+  ADD KEY `fk_category` (`category_id`),
+  ADD KEY `idx_article_title` (`title`),
+  ADD KEY `idx_category_id` (`category_id`);
+ALTER TABLE `articles` ADD FULLTEXT KEY `title` (`title`,`content`);
 
 --
 -- Indexes for table `categories`
@@ -221,7 +226,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `articles`
 --
 ALTER TABLE `articles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
 -- AUTO_INCREMENT for table `categories`
@@ -245,7 +250,7 @@ ALTER TABLE `messages`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables
