@@ -4,7 +4,8 @@ import {
   navigateToSection,
   generateNavigationResponse,
   generateFollowUpQuestion,
-  generateChatResponse
+  generateChatResponse,
+  triggerSearch
 } from '../utils/navigationIntent';
 
 /**
@@ -57,18 +58,41 @@ export default function Chatbot() {
 
       let botResponseText = '';
       let shouldNavigate = false;
+      let shouldSearch = false;
 
       if (intentResult.intent && intentResult.confidence >= 0.5) {
-        // HIGH CONFIDENCE - NAVIGATE
-        botResponseText = generateNavigationResponse(intentResult.intent);
-        shouldNavigate = true;
-
-        setTimeout(() => {
-          navigateToSection(intentResult.intent);
-        }, 800);
+        // HIGH CONFIDENCE - NAVIGATE or SEARCH or ADMIN
+        
+        if (intentResult.intent === 'admin') {
+          // Admin request - navigate to admin login
+          botResponseText = "🔐 You're requesting admin access! Let me take you to the admin login console. You'll need valid admin credentials to proceed.";
+          shouldNavigate = true;
+          
+          setTimeout(() => {
+            navigateToSection('admin');
+          }, 800);
+        } else if (intentResult.intent === 'search') {
+          // Search intent - ask what they want to search for
+          botResponseText = "🔍 Got it! What would you like to search for? Just tell me what you're looking for and I'll find it for you!";
+          shouldSearch = false;
+        } else {
+          // Regular section navigation
+          botResponseText = generateNavigationResponse(intentResult.intent);
+          shouldNavigate = true;
+          
+          setTimeout(() => {
+            navigateToSection(intentResult.intent);
+          }, 800);
+        }
       } else if (intentResult.intent && intentResult.confidence > 0) {
         // MEDIUM CONFIDENCE
-        botResponseText = generateNavigationResponse(intentResult.intent) + '\n\n(Or we can just chat if you like!)';
+        if (intentResult.intent === 'admin') {
+          botResponseText = "I think you might be looking for admin access. Want me to take you to the admin login section?";
+        } else if (intentResult.intent === 'search') {
+          botResponseText = "You might want to search for something? Tell me what you're looking for!";
+        } else {
+          botResponseText = generateNavigationResponse(intentResult.intent) + '\n\n(Or we can just chat if you like!)';
+        }
         shouldNavigate = false;
       } else {
         // NO NAVIGATION INTENT - General chat

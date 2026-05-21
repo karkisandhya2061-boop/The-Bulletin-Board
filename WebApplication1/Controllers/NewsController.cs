@@ -1,7 +1,5 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
-using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
@@ -11,528 +9,716 @@ namespace WebApplication1.Controllers
     {
         private readonly IConfiguration _config;
 
-        private static readonly string[] ValidBuckets =
-            { "heroStory", "featuredSideStories", "trendingStories", "tickerItems" };
-
-        private static readonly string[] ValidStatuses =
-            { "draft", "published", "archived" };
-
         public NewsController(IConfiguration config)
         {
             _config = config;
         }
 
-        // ─── PUBLIC CONTENT FEED ──────────────────────────────────
-        // 3.3.2: Anonymous and authenticated users — always published only.
-        // Trending ordering: pinned first (pin_order ASC), then latest updated_at DESC.
+        [HttpGet("debug/latest")]
+        public IActionResult GetLatestNewsDebug()
+        {
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-        /// <summary>
-        /// GET /news/feed  — Public
-        /// Returns grouped published content:
-        ///   heroStory (single), featuredSideStories, trendingStories, tickerItems.
-        /// </summary>
+                string query = @"
+                    SELECT 
+                        id, 
+                        title, 
+                        excerpt, 
+                        location,
+                        created_at,
+                        LENGTH(image_url) as image_size,
+                        IF(image_url IS NULL OR image_url = '', 'NO IMAGE', 'HAS IMAGE') as image_status
+                    FROM news_articles
+                    ORDER BY created_at DESC
+                    LIMIT 10";
+
+                var cmd = new MySqlCommand(query, conn);
+                var articles = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    articles.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        excerpt = reader.IsDBNull(reader.GetOrdinal("excerpt")) ? "" : reader.GetString("excerpt"),
+                        location = reader.IsDBNull(reader.GetOrdinal("location")) ? "" : reader.GetString("location"),
+                        created_at = reader.GetDateTime("created_at"),
+                        image_size = reader.GetInt32("image_size"),
+                        image_status = reader.GetString("image_status")
+                    });
+                }
+
+                return Ok(new { articles, message = "Debug info for latest articles" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult GetNewsById(int id)
+        {
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = @"
+                    SELECT id, title, content, excerpt, image_url, location, created_at
+                    FROM news_articles
+                    WHERE id = @id";
+
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", id);
+
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    return Ok(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        excerpt = reader.IsDBNull(reader.GetOrdinal("excerpt")) ? "" : reader.GetString("excerpt"),
+                        content = reader.GetString("content"),
+                        location = reader.IsDBNull(reader.GetOrdinal("location")) ? "" : reader.GetString("location"),
+                        imageUrl = reader.IsDBNull(reader.GetOrdinal("image_url")) ? "" : reader.GetString("image_url"),
+                        created_at = reader.GetDateTime("created_at")
+                    });
+                }
+
+                return NotFound(new { message = "Article not found" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("test-feed")]
+        public IActionResult TestFeed()
+        {
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = @"
+                    SELECT id, title, image_url
+                    FROM news_articles
+                    WHERE status = 'published' AND image_url IS NOT NULL AND image_url != ''
+                    ORDER BY created_at DESC
+                    LIMIT 5";
+
+                var cmd = new MySqlCommand(query, conn);
+                var articles = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string imageUrl = reader.GetString("image_url");
+                    articles.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        imageSize = imageUrl.Length,
+                        imagePreview = imageUrl.Length > 50 ? imageUrl.Substring(0, 50) + "..." : imageUrl,
+                        hasImage = !string.IsNullOrEmpty(imageUrl)
+                    });
+                }
+
+                return Ok(new { articles, totalCount = articles.Count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("feed")]
         public IActionResult GetFeed()
         {
-            using var conn = OpenConnection();
-
-            var allStories = QueryStories(conn,
-                where: "status = 'published'",
-                parameters: null,
-                orderBy: "published_at DESC, created_at DESC");
-
-            var tickers = QueryTickers(conn, "status = 'published'");
-
-            // heroStory: single item, latest published_at
-            var hero = allStories
-                .Where(s => s.Bucket == "heroStory")
-                .OrderByDescending(s => s.PublishedAt)
-                .FirstOrDefault();
-
-            // featuredSideStories: latest published_at first
-            var featured = allStories
-                .Where(s => s.Bucket == "featuredSideStories")
-                .OrderByDescending(s => s.PublishedAt)
-                .ToList();
-
-            // trendingStories: pinned first (pin_order ASC), then most recently updated
-            var trending = allStories
-                .Where(s => s.Bucket == "trendingStories")
-                .OrderBy(s => s.IsPinned ? 0 : 1)
-                .ThenBy(s => s.IsPinned ? s.PinOrder : int.MaxValue)
-                .ThenByDescending(s => s.UpdatedAt)
-                .ToList();
-
-            return Ok(new
+            try
             {
-                heroStory           = hero,
-                featuredSideStories = featured,
-                trendingStories     = trending,
-                tickerItems         = tickers
-            });
-        }
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-        // ─── PUBLIC STORY ENDPOINTS ───────────────────────────────
-        // 3.3.2: Public endpoints MUST only return status=published.
+                string query = @"
+                    SELECT id, title, content, excerpt, category_id, status, published_at, created_at, image_url, location
+                    FROM news_articles
+                    WHERE status = 'published'
+                    ORDER BY published_at DESC
+                    LIMIT 20";
 
-        /// <summary>
-        /// GET /news/stories  — Public
-        /// Published stories only. Optional ?bucket and ?category filters.
-        /// Trending bucket applies pin_order -> updated_at ordering automatically.
-        /// </summary>
-        [HttpGet("stories")]
-        public IActionResult GetStories(
-            [FromQuery] string? bucket   = null,
-            [FromQuery] string? category = null)
-        {
-            using var conn = OpenConnection();
+                var cmd = new MySqlCommand(query, conn);
+                var articles = new List<object>();
 
-            var conditions = new List<string> { "status = 'published'" };
-            var parameters = new Dictionary<string, object?>();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    articles.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        excerpt = reader.IsDBNull(reader.GetOrdinal("excerpt")) ? "" : reader.GetString("excerpt"),
+                        category = "General",
+                        author = "Editorial Team",
+                        time = "5 min read",
+                        tone = new[] { "blue", "amber", "teal", "rose" }[new Random().Next(4)],
+                        tag = "New",
+                        imageUrl = reader.IsDBNull(reader.GetOrdinal("image_url")) ? "" : reader.GetString("image_url"),
+                        location = reader.IsDBNull(reader.GetOrdinal("location")) ? "General" : reader.GetString("location")
+                    });
+                }
 
-            if (!string.IsNullOrWhiteSpace(bucket))
-            {
-                conditions.Add("bucket = @Bucket");
-                parameters["@Bucket"] = bucket;
+                return Ok(new
+                {
+                    heroStory = articles.Count > 0 ? articles[0] : null,
+                    featuredSideStories = articles.Count > 1 ? articles.Skip(1).Take(2).ToList() : new List<object>(),
+                    trendingStories = articles.Count > 0 ? articles.Take(Math.Min(4, articles.Count)).ToList() : new List<object>(),
+                    tickerItems = new[] { 
+                        "Breaking: New article published", 
+                        "Latest news updates available", 
+                        "Stay informed with our news portal" 
+                    }
+                });
             }
-
-            if (!string.IsNullOrWhiteSpace(category))
+            catch (Exception ex)
             {
-                conditions.Add("category = @Category");
-                parameters["@Category"] = category;
+                return StatusCode(500, new { message = ex.Message });
             }
-
-            string where   = string.Join(" AND ", conditions);
-            string orderBy = bucket == "trendingStories"
-                ? "is_pinned DESC, pin_order ASC, updated_at DESC"
-                : "published_at DESC, created_at DESC";
-
-            return Ok(QueryStories(conn, where, parameters, orderBy));
         }
 
-        /// <summary>
-        /// GET /news/stories/{id}  — Public
-        /// Returns 404 for any story that is not status=published.
-        /// </summary>
-        [HttpGet("stories/{id:int}")]
-        public IActionResult GetStory(int id)
+        [HttpGet("category/{category}")]
+        public IActionResult GetByCategory(string category)
         {
-            using var conn = OpenConnection();
-            var story = GetStoryById(conn, id);
-
-            // 3.3.2: non-published items are invisible to public callers
-            if (story == null || story.Status != "published")
-                return NotFound(new { message = "Story not found." });
-
-            return Ok(story);
-        }
-
-        /// <summary>
-        /// GET /news/ticker  — Public
-        /// Published ticker items only, ordered by sort_order ASC then created_at ASC.
-        /// </summary>
-        [HttpGet("ticker")]
-        public IActionResult GetTicker()
-        {
-            using var conn = OpenConnection();
-            return Ok(QueryTickers(conn, "status = 'published'"));
-        }
-
-        // ─── ADMIN STORY ENDPOINTS ────────────────────────────────
-
-        /// <summary>GET /news/admin/stories  [admin] — all statuses, full filters</summary>
-        [Authorize(Roles = "admin")]
-        [HttpGet("admin/stories")]
-        public IActionResult AdminGetStories(
-            [FromQuery] string? bucket   = null,
-            [FromQuery] string? status   = null,
-            [FromQuery] string? category = null)
-        {
-            using var conn = OpenConnection();
-
-            var conditions = new List<string>();
-            var parameters = new Dictionary<string, object?>();
-
-            if (!string.IsNullOrWhiteSpace(status))
+            try
             {
-                conditions.Add("status = @Status");
-                parameters["@Status"] = status;
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = @"
+                    SELECT id, title, content, excerpt, category_id, status, published_at, image_url, location
+                    FROM news_articles
+                    WHERE status = 'published' 
+                    AND (category_id = (SELECT id FROM categories WHERE name = @category) OR @category = 'all')
+                    ORDER BY published_at DESC
+                    LIMIT 20";
+
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@category", category);
+                var articles = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    articles.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        excerpt = reader.IsDBNull(reader.GetOrdinal("excerpt")) ? "" : reader.GetString("excerpt"),
+                        category = category,
+                        imageUrl = reader.IsDBNull(reader.GetOrdinal("image_url")) ? "" : reader.GetString("image_url"),
+                        location = reader.IsDBNull(reader.GetOrdinal("location")) ? "General" : reader.GetString("location"),
+                        author = "Editorial Team",
+                        time = "5 min read",
+                        tone = new[] { "blue", "amber", "teal", "rose" }[new Random().Next(4)],
+                        tag = "New"
+                    });
+                }
+
+                return Ok(articles);
             }
-            if (!string.IsNullOrWhiteSpace(bucket))
+            catch (Exception ex)
             {
-                conditions.Add("bucket = @Bucket");
-                parameters["@Bucket"] = bucket;
+                return StatusCode(500, new { message = ex.Message });
             }
-            if (!string.IsNullOrWhiteSpace(category))
+        }
+
+        [HttpGet("search")]
+        public IActionResult SearchNews([FromQuery] string q)
+        {
+            try
             {
-                conditions.Add("category = @Category");
-                parameters["@Category"] = category;
+                if (string.IsNullOrWhiteSpace(q))
+                {
+                    return BadRequest(new { message = "Search query is required", results = new List<object>() });
+                }
+
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = @"
+                    SELECT id, title, content, excerpt, category_id, status, published_at, image_url, location
+                    FROM news_articles
+                    WHERE status = 'published' 
+                    AND (title LIKE @searchTerm OR excerpt LIKE @searchTerm OR content LIKE @searchTerm OR location LIKE @searchTerm)
+                    ORDER BY published_at DESC
+                    LIMIT 20";
+
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@searchTerm", $"%{q}%");
+                var articles = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    articles.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        title = reader.GetString("title"),
+                        excerpt = reader.IsDBNull(reader.GetOrdinal("excerpt")) ? "" : reader.GetString("excerpt"),
+                        category = "General",
+                        imageUrl = reader.IsDBNull(reader.GetOrdinal("image_url")) ? "" : reader.GetString("image_url"),
+                        location = reader.IsDBNull(reader.GetOrdinal("location")) ? "General" : reader.GetString("location"),
+                        author = "Editorial Team",
+                        time = "5 min read",
+                        tone = new[] { "blue", "amber", "teal", "rose" }[new Random().Next(4)],
+                        tag = "Search Result"
+                    });
+                }
+
+                return Ok(new { results = articles, query = q, count = articles.Count });
             }
-
-            string where = conditions.Count > 0
-                ? string.Join(" AND ", conditions)
-                : "1=1";
-
-            return Ok(QueryStories(conn, where, parameters,
-                orderBy: "is_pinned DESC, pin_order ASC, updated_at DESC"));
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        /// <summary>GET /news/admin/stories/{id}  [admin] — any status</summary>
-        [Authorize(Roles = "admin")]
-        [HttpGet("admin/stories/{id:int}")]
-        public IActionResult AdminGetStory(int id)
+        [HttpPost("create")]
+        public IActionResult CreateNews([FromBody] CreateNewsRequest request)
         {
-            using var conn = OpenConnection();
-            var story = GetStoryById(conn, id);
-            if (story == null) return NotFound(new { message = "Story not found." });
-            return Ok(story);
+            try
+            {
+                // Validate input
+                if (request == null)
+                {
+                    return BadRequest(new { message = "Request body is required", success = false });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Title))
+                {
+                    return BadRequest(new { message = "Title is required", success = false });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Content))
+                {
+                    return BadRequest(new { message = "Content is required", success = false });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.ImageUrl))
+                {
+                    return BadRequest(new { message = "Image URL is required", success = false });
+                }
+
+                // Check image URL size
+                if (request.ImageUrl.Length > 16777215) // Max for MEDIUMTEXT
+                {
+                    return BadRequest(new { message = $"Image is too large ({request.ImageUrl.Length} bytes). Max is 16MB.", success = false });
+                }
+
+                Console.WriteLine($"[NEWS] Creating article: {request.Title}");
+                Console.WriteLine($"[NEWS] Image size: {request.ImageUrl.Length} bytes");
+
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                // Get category ID
+                int categoryId = 1; // Default to first category
+                if (!string.IsNullOrEmpty(request.Category))
+                {
+                    string catQuery = "SELECT id FROM categories WHERE name = @category LIMIT 1";
+                    var catCmd = new MySqlCommand(catQuery, conn);
+                    catCmd.Parameters.AddWithValue("@category", request.Category);
+                    var catResult = catCmd.ExecuteScalar();
+                    if (catResult != null)
+                    {
+                        categoryId = Convert.ToInt32(catResult);
+                    }
+                }
+
+                // Get or create author (admin user)
+                int authorId = 1;
+                string authorQuery = "SELECT id FROM users WHERE role = 'admin' LIMIT 1";
+                var authorCmd = new MySqlCommand(authorQuery, conn);
+                var authorResult = authorCmd.ExecuteScalar();
+                if (authorResult != null)
+                {
+                    authorId = Convert.ToInt32(authorResult);
+                }
+
+                // Insert news article
+                string insertQuery = @"
+                    INSERT INTO news_articles (title, content, excerpt, category_id, author_id, status, published_at, created_at, updated_at, image_url, location)
+                    VALUES (@title, @content, @excerpt, @categoryId, @authorId, 'published', NOW(), NOW(), NOW(), @imageUrl, @location)";
+
+                var insertCmd = new MySqlCommand(insertQuery, conn);
+                insertCmd.Parameters.AddWithValue("@title", request.Title);
+                insertCmd.Parameters.AddWithValue("@content", request.Content);
+                insertCmd.Parameters.AddWithValue("@excerpt", request.Excerpt ?? "");
+                insertCmd.Parameters.AddWithValue("@categoryId", categoryId);
+                insertCmd.Parameters.AddWithValue("@authorId", authorId);
+                insertCmd.Parameters.AddWithValue("@imageUrl", request.ImageUrl ?? "");
+                insertCmd.Parameters.AddWithValue("@location", request.Location ?? "General");
+
+                int rowsAffected = insertCmd.ExecuteNonQuery();
+                Console.WriteLine($"[NEWS] Insert result: {rowsAffected} rows affected");
+
+                if (rowsAffected > 0)
+                {
+                    // Verify the insert by querying back
+                    string verifyQuery = "SELECT image_url FROM news_articles WHERE title = @title ORDER BY created_at DESC LIMIT 1";
+                    var verifyCmd = new MySqlCommand(verifyQuery, conn);
+                    verifyCmd.Parameters.AddWithValue("@title", request.Title);
+                    var verifyResult = verifyCmd.ExecuteScalar();
+                    
+                    if (verifyResult != null && verifyResult != DBNull.Value)
+                    {
+                        string savedImage = verifyResult.ToString();
+                        Console.WriteLine($"[NEWS] Verification: Image saved, size={savedImage.Length} bytes");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[NEWS] WARNING: Image not found in verification query!");
+                    }
+                }
+
+                return Ok(new { message = "News article created successfully", success = true });
+            }
+            catch (MySqlException ex)
+            {
+                Console.WriteLine($"[NEWS] MySql Error: {ex.Message}");
+                return StatusCode(500, new { message = $"Database error: {ex.Message}", success = false });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NEWS] Error: {ex.Message}");
+                return StatusCode(500, new { message = $"Error: {ex.Message}", success = false });
+            }
         }
 
-        /// <summary>POST /news/admin/stories  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpPost("admin/stories")]
-        public IActionResult CreateStory([FromBody] CreateStoryRequest req)
+        [HttpPost("{id}/reactions")]
+        public IActionResult AddReaction(int id, [FromBody] ReactionRequest request)
         {
-            if (!ValidBuckets.Contains(req.Bucket))
-                return BadRequest(new { message = $"Invalid bucket. Must be one of: {string.Join(", ", ValidBuckets)}" });
-            if (!ValidStatuses.Contains(req.Status))
-                return BadRequest(new { message = $"Invalid status. Must be one of: {string.Join(", ", ValidStatuses)}" });
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            using var conn = OpenConnection();
-            if (req.Bucket == "heroStory" && req.Status == "published")
-                ArchiveExistingHero(conn);
+                // Check if article exists
+                string checkQuery = "SELECT id FROM news_articles WHERE id = @id";
+                var checkCmd = new MySqlCommand(checkQuery, conn);
+                checkCmd.Parameters.AddWithValue("@id", id);
+                var result = checkCmd.ExecuteScalar();
+                
+                if (result == null)
+                {
+                    return NotFound(new { message = "Article not found", success = false });
+                }
 
-            var now = DateTime.UtcNow;
-            var cmd = new MySqlCommand(@"
-                INSERT INTO stories
-                    (bucket, category, title, excerpt, author, read_time_minutes,
-                     tone, is_pinned, pin_order, status, published_at, created_at, updated_at)
-                VALUES
-                    (@Bucket, @Category, @Title, @Excerpt, @Author, @ReadTime,
-                     @Tone, @IsPinned, @PinOrder, @Status, @PublishedAt, @Now, @Now);
-                SELECT LAST_INSERT_ID();", conn);
+                // Insert or update reaction
+                string query = @"
+                    INSERT INTO news_reactions (news_article_id, user_id, reaction_type)
+                    VALUES (@newsId, @userId, @reactionType)
+                    ON DUPLICATE KEY UPDATE reaction_type = @reactionType";
 
-            BindStoryParams(cmd, req, now);
-            var newId = Convert.ToInt32(cmd.ExecuteScalar());
-            return CreatedAtAction(nameof(AdminGetStory), new { id = newId }, GetStoryById(conn, newId));
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@newsId", id);
+                cmd.Parameters.AddWithValue("@userId", request.UserId ?? 0);
+                cmd.Parameters.AddWithValue("@reactionType", request.ReactionType);
+
+                cmd.ExecuteNonQuery();
+
+                // Create notification for admin
+                string notifQuery = @"
+                    INSERT INTO admin_notifications (news_article_id, notification_type, user_name, action_text)
+                    VALUES (@newsId, 'reaction', @userName, @actionText)";
+                
+                var notifCmd = new MySqlCommand(notifQuery, conn);
+                notifCmd.Parameters.AddWithValue("@newsId", id);
+                notifCmd.Parameters.AddWithValue("@userName", request.UserName ?? "User");
+                notifCmd.Parameters.AddWithValue("@actionText", $"User reacted with {request.ReactionType}");
+                notifCmd.ExecuteNonQuery();
+
+                // Get updated reaction counts
+                string countQuery = @"
+                    SELECT reaction_type, COUNT(*) as count
+                    FROM news_reactions
+                    WHERE news_article_id = @newsId
+                    GROUP BY reaction_type";
+
+                var countCmd = new MySqlCommand(countQuery, conn);
+                countCmd.Parameters.AddWithValue("@newsId", id);
+                var reactions = new Dictionary<string, int>();
+
+                using var reader = countCmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    reactions[reader.GetString("reaction_type")] = reader.GetInt32("count");
+                }
+
+                return Ok(new { message = "Reaction added", success = true, reactions });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, success = false });
+            }
         }
 
-        /// <summary>PUT /news/admin/stories/{id}  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpPut("admin/stories/{id:int}")]
-        public IActionResult UpdateStory(int id, [FromBody] UpdateStoryRequest req)
+        [HttpGet("{id}/reactions")]
+        public IActionResult GetReactions(int id)
         {
-            if (!ValidBuckets.Contains(req.Bucket))
-                return BadRequest(new { message = $"Invalid bucket. Must be one of: {string.Join(", ", ValidBuckets)}" });
-            if (!ValidStatuses.Contains(req.Status))
-                return BadRequest(new { message = $"Invalid status. Must be one of: {string.Join(", ", ValidStatuses)}" });
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            using var conn = OpenConnection();
-            if (GetStoryById(conn, id) == null) return NotFound(new { message = "Story not found." });
+                string query = @"
+                    SELECT reaction_type, COUNT(*) as count
+                    FROM news_reactions
+                    WHERE news_article_id = @newsId
+                    GROUP BY reaction_type";
 
-            if (req.Bucket == "heroStory" && req.Status == "published")
-                ArchiveExistingHero(conn, excludeId: id);
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@newsId", id);
+                var reactions = new Dictionary<string, int>();
 
-            var now = DateTime.UtcNow;
-            var cmd = new MySqlCommand(@"
-                UPDATE stories SET
-                    bucket            = @Bucket,
-                    category          = @Category,
-                    title             = @Title,
-                    excerpt           = @Excerpt,
-                    author            = @Author,
-                    read_time_minutes = @ReadTime,
-                    tone              = @Tone,
-                    is_pinned         = @IsPinned,
-                    pin_order         = @PinOrder,
-                    status            = @Status,
-                    published_at      = @PublishedAt,
-                    updated_at        = @Now
-                WHERE id = @Id", conn);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    reactions[reader.GetString("reaction_type")] = reader.GetInt32("count");
+                }
 
-            BindStoryParams(cmd, req, now);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.ExecuteNonQuery();
-
-            return Ok(GetStoryById(conn, id));
+                return Ok(new { reactions, success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        /// <summary>PATCH /news/admin/stories/{id}/status  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpPatch("admin/stories/{id:int}/status")]
-        public IActionResult PatchStoryStatus(int id, [FromBody] PatchStatusRequest req)
+        [HttpPost("{id}/comments")]
+        public IActionResult AddComment(int id, [FromBody] CommentRequest request)
         {
-            if (!ValidStatuses.Contains(req.Status))
-                return BadRequest(new { message = $"Invalid status. Must be one of: {string.Join(", ", ValidStatuses)}" });
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request?.CommentText))
+                {
+                    return BadRequest(new { message = "Comment text is required", success = false });
+                }
 
-            using var conn = OpenConnection();
-            var existing = GetStoryById(conn, id);
-            if (existing == null) return NotFound(new { message = "Story not found." });
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            if (existing.Bucket == "heroStory" && req.Status == "published")
-                ArchiveExistingHero(conn, excludeId: id);
+                // Check if article exists
+                string checkQuery = "SELECT id FROM news_articles WHERE id = @id";
+                var checkCmd = new MySqlCommand(checkQuery, conn);
+                checkCmd.Parameters.AddWithValue("@id", id);
+                var result = checkCmd.ExecuteScalar();
+                
+                if (result == null)
+                {
+                    return NotFound(new { message = "Article not found", success = false });
+                }
 
-            var now   = DateTime.UtcNow;
-            var pubAt = req.Status == "published" ? (existing.PublishedAt ?? now) : existing.PublishedAt;
+                // Insert comment
+                string insertQuery = @"
+                    INSERT INTO news_comments (news_article_id, user_id, user_name, comment_text)
+                    VALUES (@newsId, @userId, @userName, @commentText)";
 
-            var cmd = new MySqlCommand(@"
-                UPDATE stories
-                SET status = @Status, published_at = @PublishedAt, updated_at = @Now
-                WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Status",      req.Status);
-            cmd.Parameters.AddWithValue("@PublishedAt", (object?)pubAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Now",         now);
-            cmd.Parameters.AddWithValue("@Id",          id);
-            cmd.ExecuteNonQuery();
+                var cmd = new MySqlCommand(insertQuery, conn);
+                cmd.Parameters.AddWithValue("@newsId", id);
+                cmd.Parameters.AddWithValue("@userId", request.UserId ?? 0);
+                cmd.Parameters.AddWithValue("@userName", request.UserName ?? "Anonymous");
+                cmd.Parameters.AddWithValue("@commentText", request.CommentText);
 
-            return Ok(GetStoryById(conn, id));
+                cmd.ExecuteNonQuery();
+
+                // Create notification for admin
+                string notifQuery = @"
+                    INSERT INTO admin_notifications (news_article_id, notification_type, user_name, action_text)
+                    VALUES (@newsId, 'comment', @userName, @actionText)";
+                
+                var notifCmd = new MySqlCommand(notifQuery, conn);
+                notifCmd.Parameters.AddWithValue("@newsId", id);
+                notifCmd.Parameters.AddWithValue("@userName", request.UserName ?? "Anonymous");
+                notifCmd.Parameters.AddWithValue("@actionText", $"New comment: {request.CommentText.Substring(0, Math.Min(50, request.CommentText.Length))}");
+                notifCmd.ExecuteNonQuery();
+
+                return Ok(new { message = "Comment added", success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, success = false });
+            }
         }
 
-        /// <summary>
-        /// PATCH /news/admin/stories/{id}/pin  [admin]
-        /// Sets is_pinned and pin_order. Bumps updated_at so pin changes are reflected in ordering.
-        /// </summary>
-        [Authorize(Roles = "admin")]
-        [HttpPatch("admin/stories/{id:int}/pin")]
-        public IActionResult PatchStoryPin(int id, [FromBody] PatchPinRequest req)
+        [HttpGet("{id}/comments")]
+        public IActionResult GetComments(int id)
         {
-            using var conn = OpenConnection();
-            if (GetStoryById(conn, id) == null)
-                return NotFound(new { message = "Story not found." });
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            var cmd = new MySqlCommand(@"
-                UPDATE stories
-                SET is_pinned = @IsPinned, pin_order = @PinOrder, updated_at = @Now
-                WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@IsPinned", req.IsPinned);
-            cmd.Parameters.AddWithValue("@PinOrder", req.PinOrder);
-            cmd.Parameters.AddWithValue("@Now",      DateTime.UtcNow);
-            cmd.Parameters.AddWithValue("@Id",       id);
-            cmd.ExecuteNonQuery();
+                string query = @"
+                    SELECT id, user_name, comment_text, created_at
+                    FROM news_comments
+                    WHERE news_article_id = @newsId
+                    ORDER BY created_at DESC
+                    LIMIT 50";
 
-            return Ok(GetStoryById(conn, id));
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@newsId", id);
+                var comments = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    comments.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        user_name = reader.GetString("user_name"),
+                        comment_text = reader.GetString("comment_text"),
+                        created_at = reader.GetDateTime("created_at")
+                    });
+                }
+
+                return Ok(new { comments, success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        /// <summary>DELETE /news/admin/stories/{id}  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpDelete("admin/stories/{id:int}")]
-        public IActionResult DeleteStory(int id)
+        [HttpGet("notifications")]
+        public IActionResult GetNotifications()
         {
-            using var conn = OpenConnection();
-            if (GetStoryById(conn, id) == null)
-                return NotFound(new { message = "Story not found." });
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            var cmd = new MySqlCommand("DELETE FROM stories WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.ExecuteNonQuery();
-            return Ok(new { message = "Story deleted." });
+                string query = @"
+                    SELECT id, news_article_id, notification_type, user_name, action_text, is_read, created_at
+                    FROM admin_notifications
+                    ORDER BY created_at DESC
+                    LIMIT 50";
+
+                var cmd = new MySqlCommand(query, conn);
+                var notifications = new List<object>();
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    notifications.Add(new
+                    {
+                        id = reader.GetInt32("id"),
+                        articleId = reader.GetInt32("news_article_id"),
+                        type = reader.GetString("notification_type"),
+                        userName = reader.GetString("user_name"),
+                        actionText = reader.GetString("action_text"),
+                        isRead = reader.GetBoolean("is_read"),
+                        createdAt = reader.GetDateTime("created_at")
+                    });
+                }
+
+                return Ok(new { notifications, success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        // ─── ADMIN TICKER ENDPOINTS ───────────────────────────────
-
-        /// <summary>GET /news/admin/ticker  [admin] — returns all statuses</summary>
-        [Authorize(Roles = "admin")]
-        [HttpGet("admin/ticker")]
-        public IActionResult AdminGetTicker([FromQuery] string? status = null)
+        [HttpPost("notifications/{id}/read")]
+        public IActionResult MarkNotificationRead(int id)
         {
-            using var conn = OpenConnection();
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
 
-            var cmd = new MySqlCommand(string.IsNullOrWhiteSpace(status)
-                ? "SELECT id, text, status, sort_order, created_at, updated_at FROM ticker_items ORDER BY sort_order ASC, created_at ASC"
-                : "SELECT id, text, status, sort_order, created_at, updated_at FROM ticker_items WHERE status = @Status ORDER BY sort_order ASC, created_at ASC",
-                conn);
+                string query = @"
+                    UPDATE admin_notifications
+                    SET is_read = TRUE
+                    WHERE id = @id";
 
-            if (!string.IsNullOrWhiteSpace(status))
-                cmd.Parameters.AddWithValue("@Status", status);
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
 
-            var list = new List<TickerItem>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read()) list.Add(MapTicker(reader));
-            return Ok(list);
+                return Ok(new { message = "Notification marked as read", success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        /// <summary>POST /news/admin/ticker  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpPost("admin/ticker")]
-        public IActionResult CreateTicker([FromBody] CreateTickerItemRequest req)
+        [HttpGet("notifications/unread-count")]
+        public IActionResult GetUnreadNotificationCount()
         {
-            using var conn = OpenConnection();
-            var now = DateTime.UtcNow;
-            var cmd = new MySqlCommand(@"
-                INSERT INTO ticker_items (text, status, sort_order, created_at, updated_at)
-                VALUES (@Text, @Status, @SortOrder, @Now, @Now);
-                SELECT LAST_INSERT_ID();", conn);
-            cmd.Parameters.AddWithValue("@Text",      req.Text);
-            cmd.Parameters.AddWithValue("@Status",    req.Status);
-            cmd.Parameters.AddWithValue("@SortOrder", req.SortOrder);
-            cmd.Parameters.AddWithValue("@Now",       now);
-            var newId = Convert.ToInt32(cmd.ExecuteScalar());
-            return Ok(GetTickerById(conn, newId));
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = "SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = FALSE";
+                var cmd = new MySqlCommand(query, conn);
+                var count = (int)cmd.ExecuteScalar();
+
+                return Ok(new { unreadCount = count, success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
-
-        /// <summary>PUT /news/admin/ticker/{id}  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpPut("admin/ticker/{id:int}")]
-        public IActionResult UpdateTicker(int id, [FromBody] UpdateTickerItemRequest req)
-        {
-            using var conn = OpenConnection();
-            if (GetTickerById(conn, id) == null)
-                return NotFound(new { message = "Ticker item not found." });
-
-            var cmd = new MySqlCommand(@"
-                UPDATE ticker_items
-                SET text = @Text, status = @Status, sort_order = @SortOrder, updated_at = @Now
-                WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Text",      req.Text);
-            cmd.Parameters.AddWithValue("@Status",    req.Status);
-            cmd.Parameters.AddWithValue("@SortOrder", req.SortOrder);
-            cmd.Parameters.AddWithValue("@Now",       DateTime.UtcNow);
-            cmd.Parameters.AddWithValue("@Id",        id);
-            cmd.ExecuteNonQuery();
-            return Ok(GetTickerById(conn, id));
-        }
-
-        /// <summary>DELETE /news/admin/ticker/{id}  [admin]</summary>
-        [Authorize(Roles = "admin")]
-        [HttpDelete("admin/ticker/{id:int}")]
-        public IActionResult DeleteTicker(int id)
-        {
-            using var conn = OpenConnection();
-            if (GetTickerById(conn, id) == null)
-                return NotFound(new { message = "Ticker item not found." });
-
-            var cmd = new MySqlCommand("DELETE FROM ticker_items WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.ExecuteNonQuery();
-            return Ok(new { message = "Ticker item deleted." });
-        }
-
-        // ─── HELPERS ─────────────────────────────────────────────
-
-        private MySqlConnection OpenConnection()
-        {
-            var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
-            return conn;
-        }
-
-        private static List<Story> QueryStories(
-            MySqlConnection conn,
-            string where,
-            Dictionary<string, object?>? parameters,
-            string orderBy = "published_at DESC, created_at DESC")
-        {
-            var cmd = new MySqlCommand($@"
-                SELECT id, bucket, category, title, excerpt, author,
-                       read_time_minutes, tone, is_pinned, pin_order,
-                       status, published_at, created_at, updated_at
-                FROM stories
-                WHERE {where}
-                ORDER BY {orderBy}", conn);
-
-            if (parameters != null)
-                foreach (var (k, v) in parameters)
-                    cmd.Parameters.AddWithValue(k, v ?? DBNull.Value);
-
-            var list = new List<Story>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read()) list.Add(MapStory(reader));
-            return list;
-        }
-
-        private static List<TickerItem> QueryTickers(MySqlConnection conn, string where)
-        {
-            var cmd = new MySqlCommand($@"
-                SELECT id, text, status, sort_order, created_at, updated_at
-                FROM ticker_items
-                WHERE {where}
-                ORDER BY sort_order ASC, created_at ASC", conn);
-
-            var list = new List<TickerItem>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read()) list.Add(MapTicker(reader));
-            return list;
-        }
-
-        private static Story? GetStoryById(MySqlConnection conn, int id)
-        {
-            var cmd = new MySqlCommand(@"
-                SELECT id, bucket, category, title, excerpt, author,
-                       read_time_minutes, tone, is_pinned, pin_order,
-                       status, published_at, created_at, updated_at
-                FROM stories WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Id", id);
-            using var reader = cmd.ExecuteReader();
-            return reader.Read() ? MapStory(reader) : null;
-        }
-
-        private static TickerItem? GetTickerById(MySqlConnection conn, int id)
-        {
-            var cmd = new MySqlCommand(@"
-                SELECT id, text, status, sort_order, created_at, updated_at
-                FROM ticker_items WHERE id = @Id", conn);
-            cmd.Parameters.AddWithValue("@Id", id);
-            using var reader = cmd.ExecuteReader();
-            return reader.Read() ? MapTicker(reader) : null;
-        }
-
-        private static void ArchiveExistingHero(MySqlConnection conn, int excludeId = 0)
-        {
-            var cmd = new MySqlCommand(@"
-                UPDATE stories
-                SET status = 'archived', updated_at = @Now
-                WHERE bucket = 'heroStory' AND status = 'published' AND id != @ExcludeId", conn);
-            cmd.Parameters.AddWithValue("@Now",       DateTime.UtcNow);
-            cmd.Parameters.AddWithValue("@ExcludeId", excludeId);
-            cmd.ExecuteNonQuery();
-        }
-
-        private static void BindStoryParams(MySqlCommand cmd, CreateStoryRequest req, DateTime now)
-        {
-            cmd.Parameters.AddWithValue("@Bucket",      req.Bucket);
-            cmd.Parameters.AddWithValue("@Category",    req.Category);
-            cmd.Parameters.AddWithValue("@Title",       req.Title);
-            cmd.Parameters.AddWithValue("@Excerpt",     req.Excerpt);
-            cmd.Parameters.AddWithValue("@Author",      req.Author);
-            cmd.Parameters.AddWithValue("@ReadTime",    req.ReadTimeMinutes);
-            cmd.Parameters.AddWithValue("@Tone",        req.Tone);
-            cmd.Parameters.AddWithValue("@IsPinned",    req.IsPinned);
-            cmd.Parameters.AddWithValue("@PinOrder",    req.PinOrder);
-            cmd.Parameters.AddWithValue("@Status",      req.Status);
-            cmd.Parameters.AddWithValue("@PublishedAt", (object?)req.PublishedAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Now",         now);
-        }
-
-        private static Story MapStory(MySqlDataReader r) => new Story
-        {
-            Id              = r.GetInt32("id"),
-            Bucket          = r.GetString("bucket"),
-            Category        = r.IsDBNull(r.GetOrdinal("category"))    ? "" : r.GetString("category"),
-            Title           = r.GetString("title"),
-            Excerpt         = r.IsDBNull(r.GetOrdinal("excerpt"))     ? "" : r.GetString("excerpt"),
-            Author          = r.IsDBNull(r.GetOrdinal("author"))      ? "" : r.GetString("author"),
-            ReadTimeMinutes = r.GetInt32("read_time_minutes"),
-            Tone            = r.IsDBNull(r.GetOrdinal("tone"))        ? "" : r.GetString("tone"),
-            IsPinned        = r.GetBoolean("is_pinned"),
-            PinOrder        = r.GetInt32("pin_order"),
-            Status          = r.GetString("status"),
-            PublishedAt     = r.IsDBNull(r.GetOrdinal("published_at")) ? null : r.GetDateTime("published_at"),
-            CreatedAt       = r.GetDateTime("created_at"),
-            UpdatedAt       = r.GetDateTime("updated_at"),
-        };
-
-        private static TickerItem MapTicker(MySqlDataReader r) => new TickerItem
-        {
-            Id        = r.GetInt32("id"),
-            Text      = r.GetString("text"),
-            Status    = r.GetString("status"),
-            SortOrder = r.GetInt32("sort_order"),
-            CreatedAt = r.GetDateTime("created_at"),
-            UpdatedAt = r.GetDateTime("updated_at"),
-        };
     }
 
-    // ─── Request DTOs ─────────────────────────────────────────────
-    public record PatchStatusRequest(string Status);
-    public record PatchPinRequest(bool IsPinned, int PinOrder);
+    public class CreateNewsRequest
+    {
+        public string Title { get; set; }
+        public string Content { get; set; }
+        public string Excerpt { get; set; }
+        public string Category { get; set; }
+        public string Location { get; set; }
+        public string ImageUrl { get; set; }
+    }
+
+    public class ReactionRequest
+    {
+        public int? UserId { get; set; }
+        public string UserName { get; set; }
+        public string ReactionType { get; set; } // like, love, haha, wow, sad, angry
+    }
+
+    public class CommentRequest
+    {
+        public int? UserId { get; set; }
+        public string UserName { get; set; }
+        public string CommentText { get; set; }
+    }
 }

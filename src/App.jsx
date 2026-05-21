@@ -205,6 +205,12 @@ function App() {
   const [newsCreating, setNewsCreating] = useState(false);
   const [showNewsForm, setShowNewsForm] = useState(false);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   // Fetch section-specific content
   useEffect(() => {
     if (!window.location.hash) {
@@ -223,12 +229,30 @@ function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleNavigateToAdmin = (event) => {
+      // Navigate to auth screen with admin tab
+      setActiveAuthTab('admin');
+      setScreen('auth');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleTriggerSearch = (event) => {
+      const searchTerm = event.detail?.query || '';
+      if (searchTerm) {
+        performSearch(searchTerm);
+      }
+    };
+
     window.addEventListener('hashchange', syncSectionFromHash);
     window.addEventListener('navigate-section', handleNavigateSection);
+    window.addEventListener('navigate-to-admin', handleNavigateToAdmin);
+    window.addEventListener('trigger-search', handleTriggerSearch);
 
     return () => {
       window.removeEventListener('hashchange', syncSectionFromHash);
       window.removeEventListener('navigate-section', handleNavigateSection);
+      window.removeEventListener('navigate-to-admin', handleNavigateToAdmin);
+      window.removeEventListener('trigger-search', handleTriggerSearch);
     };
   }, []);
 
@@ -332,6 +356,41 @@ function App() {
 
       return nextCount;
     });
+  };
+
+  const performSearch = async (query) => {
+    if (!query || !query.trim()) {
+      return;
+    }
+
+    setSearchQuery(query);
+    setIsSearching(true);
+    setShowSearchResults(true);
+
+    try {
+      const searchResults = await newsService.searchNews(query);
+      setSearchResults(searchResults.results || []);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    performSearch(searchQuery);
+  };
+
+  const closeSearchResults = () => {
+    setShowSearchResults(false);
+    setSearchResults([]);
+    setSearchQuery('');
   };
 
   const handleLogin = async (event) => {
@@ -1116,10 +1175,16 @@ function App() {
         </nav>
 
         <div className="header-actions">
-          <div className="search-box">
+          <form className="search-box" onSubmit={handleSearchSubmit}>
             <span aria-hidden="true">⌕</span>
-            <input type="text" placeholder="Search news..." />
-          </div>
+            <input 
+              type="text" 
+              placeholder="Search news..." 
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              aria-label="Search news articles"
+            />
+          </form>
           {isLoggedIn ? (
             <>
               <span className="signed-in-badge">Signed in</span>
@@ -1149,6 +1214,44 @@ function App() {
           >
             ×
           </button>
+        </div>
+      )}
+
+      {showSearchResults && (
+        <div className="search-results-panel">
+          <div className="search-results-header">
+            <h2>Search Results for "{searchQuery}"</h2>
+            <button 
+              type="button" 
+              className="search-close-button" 
+              onClick={closeSearchResults}
+              aria-label="Close search results"
+            >
+              ×
+            </button>
+          </div>
+          <div className="search-results-content">
+            {isSearching ? (
+              <div className="search-loading">
+                <span>🔍 Searching...</span>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="search-results-grid">
+                {searchResults.map((result) => (
+                  <NewsCard
+                    key={result.id}
+                    id={result.id}
+                    {...result}
+                    onSelect={() => setSelectedNews(result)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="search-no-results">
+                <p>No articles found matching "{searchQuery}". Try a different search term!</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

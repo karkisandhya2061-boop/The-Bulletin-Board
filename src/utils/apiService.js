@@ -86,6 +86,16 @@ export const newsService = {
   },
 
   /**
+   * Search news articles
+   */
+  searchNews: async (query) => {
+    if (!query || !query.trim()) {
+      return { results: [], query: '', count: 0 };
+    }
+    return await get(`/news/search?q=${encodeURIComponent(query)}`);
+  },
+
+  /**
    * Create news article with image (admin only)
    */
   createNews: async (newsData) => {

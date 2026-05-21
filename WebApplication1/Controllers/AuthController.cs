@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
-using WebApplication1.Models;
-using WebApplication1.Services;
+using Microsoft.IdentityModel.Tokens;
 
 namespace WebApplication1.Controllers
 {
@@ -14,213 +13,133 @@ namespace WebApplication1.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _config;
-        private readonly JwtService _jwt;
 
-        public AuthController(IConfiguration config, JwtService jwt)
+        public AuthController(IConfiguration config)
         {
             _config = config;
-            _jwt = jwt;
         }
 
-        // ─── SIGNUP ───────────────────────────────────────────────
-        [HttpPost("signup")]
-        public IActionResult Signup([FromBody] User user)
-        {
-            string hashedPassword = HashPassword(user.Password);
-
-            using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
-
-            string query = @"INSERT INTO users 
-                (first_name, last_name, email, phone, address, country, password, role)
-                VALUES 
-                (@FirstName, @LastName, @Email, @Phone, @Address, @Country, @Password, @Role)";
-
-            var cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@FirstName", user.FirstName);
-            cmd.Parameters.AddWithValue("@LastName",  user.LastName);
-            cmd.Parameters.AddWithValue("@Email",     user.Email);
-            cmd.Parameters.AddWithValue("@Phone",     user.Phone);
-            cmd.Parameters.AddWithValue("@Address",   user.Address);
-            cmd.Parameters.AddWithValue("@Country",   user.Country);
-            cmd.Parameters.AddWithValue("@Password",  hashedPassword);
-            cmd.Parameters.AddWithValue("@Role",      user.Role ?? "user");
-
-            try   { cmd.ExecuteNonQuery(); }
-            catch (MySqlException) { return Conflict(new { message = "Email already exists." }); }
-
-            return Ok(new { message = "User registered successfully." });
-        }
-
-        // ─── LOGIN ────────────────────────────────────────────────
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest req)
+        public IActionResult Login([FromBody] LoginRequest request)
         {
-            string hashedPassword = HashPassword(req.Password);
-
-            using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
-
-            var cmd = new MySqlCommand(
-                "SELECT id, email, role FROM users WHERE email=@Email AND password=@Password AND is_active=1",
-                conn);
-            cmd.Parameters.AddWithValue("@Email",    req.Email);
-            cmd.Parameters.AddWithValue("@Password", hashedPassword);
-
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
-                return Unauthorized(new { message = "Invalid credentials." });
-
-            var userId = Convert.ToInt32(reader["id"]);
-            var email  = reader["email"].ToString()!;
-            var role   = reader["role"].ToString()!;
-            reader.Close();
-
-            var accessToken  = _jwt.GenerateToken(userId, email, role);
-            var refreshToken = _jwt.GenerateRefreshToken();
-            SaveRefreshToken(conn, userId, refreshToken);
-
-            return Ok(new
+            try
             {
-                accessToken,
-                refreshToken,
-                expiresInSeconds = 3600,
-                user = new { userId, email, role }
-            });
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = "SELECT id, email, first_name, role FROM users WHERE email = @email LIMIT 1";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@email", request.Email);
+
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read())
+                {
+                    return Unauthorized(new { message = "Invalid email or password" });
+                }
+
+                var userId = reader.GetInt32("id");
+                var email = reader.GetString("email");
+                var firstName = reader.GetString("first_name");
+                var role = reader.GetString("role");
+
+                var token = GenerateJwtToken(userId, email, firstName, role);
+
+                return Ok(new { accessToken = token, userId, email, firstName, role });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
-        // ─── ADMIN LOGIN ──────────────────────────────────────────
+        [HttpPost("signup")]
+        public IActionResult Signup([FromBody] SignupRequest request)
+        {
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                using var conn = new MySqlConnection(connStr);
+                conn.Open();
+
+                string query = @"INSERT INTO users (first_name, last_name, email, password, role)
+                                VALUES (@firstName, @lastName, @email, SHA2(@password, 256), 'user')";
+                var cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@firstName", request.FirstName ?? "");
+                cmd.Parameters.AddWithValue("@lastName", request.LastName ?? "");
+                cmd.Parameters.AddWithValue("@email", request.Email);
+                cmd.Parameters.AddWithValue("@password", request.Password);
+
+                cmd.ExecuteNonQuery();
+
+                return Ok(new { message = "User created successfully" });
+            }
+            catch (MySqlException ex) when (ex.Message.Contains("Duplicate"))
+            {
+                return Conflict(new { message = "Email already exists" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         [HttpPost("admin-login")]
-        public IActionResult AdminLogin([FromBody] AdminLoginRequest req)
+        public IActionResult AdminLogin([FromBody] AdminLoginRequest request)
         {
-            string hashedPassword = HashPassword(req.Password);
-
-            using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
-
-            var cmd = new MySqlCommand(
-                @"SELECT id, email, role FROM users 
-                  WHERE (email=@Login OR username=@Login) 
-                  AND password=@Password AND role='admin' AND is_active=1",
-                conn);
-            cmd.Parameters.AddWithValue("@Login",    req.Login);
-            cmd.Parameters.AddWithValue("@Password", hashedPassword);
-
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
-                return Unauthorized(new { message = "Invalid admin credentials." });
-
-            var userId = Convert.ToInt32(reader["id"]);
-            var email  = reader["email"].ToString()!;
-            var role   = reader["role"].ToString()!;
-            reader.Close();
-
-            var accessToken  = _jwt.GenerateToken(userId, email, role);
-            var refreshToken = _jwt.GenerateRefreshToken();
-            SaveRefreshToken(conn, userId, refreshToken);
-
-            return Ok(new
+            // Simple admin login - in production use proper credentials
+            if (request.Username != "admin" || request.Password != "admin")
             {
-                accessToken,
-                refreshToken,
-                expiresInSeconds = 3600,
-                user = new { userId, email, role }
-            });
+                return Unauthorized(new { message = "Invalid admin credentials" });
+            }
+
+            var token = GenerateJwtToken(0, "admin@portal.com", "Admin", "admin");
+            return Ok(new { accessToken = token, role = "admin" });
         }
 
-        // ─── REFRESH ──────────────────────────────────────────────
-        [HttpPost("refresh")]
-        public IActionResult Refresh([FromBody] RefreshRequest req)
+        private string GenerateJwtToken(int userId, string email, string firstName, string role)
         {
-            using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
+            var jwtSettings = _config.GetSection("Jwt");
+            var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
-            var cmd = new MySqlCommand(
-                @"SELECT rt.user_id, u.email, u.role 
-                  FROM refresh_tokens rt
-                  JOIN users u ON u.id = rt.user_id
-                  WHERE rt.token=@Token 
-                    AND rt.is_revoked=0 
-                    AND rt.expires_at > UTC_TIMESTAMP()",
-                conn);
-            cmd.Parameters.AddWithValue("@Token", req.RefreshToken);
-
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
-                return Unauthorized(new { message = "Invalid or expired refresh token." });
-
-            var userId = Convert.ToInt32(reader["user_id"]);
-            var email  = reader["email"].ToString()!;
-            var role   = reader["role"].ToString()!;
-            reader.Close();
-
-            RevokeRefreshToken(conn, req.RefreshToken);
-            var newAccessToken  = _jwt.GenerateToken(userId, email, role);
-            var newRefreshToken = _jwt.GenerateRefreshToken();
-            SaveRefreshToken(conn, userId, newRefreshToken);
-
-            return Ok(new
+            var claims = new[]
             {
-                accessToken  = newAccessToken,
-                refreshToken = newRefreshToken,
-                expiresInSeconds = 3600
-            });
-        }
+                new Claim("userId", userId.ToString()),
+                new Claim("email", email),
+                new Claim("firstName", firstName),
+                new Claim("role", role)
+            };
 
-        // ─── LOGOUT ───────────────────────────────────────────────
-        [HttpPost("logout")]
-        public IActionResult Logout([FromBody] RefreshRequest req)
-        {
-            using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
-            conn.Open();
-            RevokeRefreshToken(conn, req.RefreshToken);
-            return Ok(new { message = "Logged out successfully." });
-        }
+            var creds = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
+            var token = new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(int.Parse(jwtSettings["DurationInMinutes"] ?? "60")),
+                signingCredentials: creds
+            );
 
-        // ─── ME ───────────────────────────────────────────────────
-        [Authorize]
-        [HttpGet("me")]
-        public IActionResult Me()
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var email  = User.FindFirstValue(ClaimTypes.Email);
-            var role   = User.FindFirstValue(ClaimTypes.Role);
-            return Ok(new { userId, email, role });
-        }
-
-        // ─── HELPERS ─────────────────────────────────────────────
-        private void SaveRefreshToken(MySqlConnection conn, int userId, string token)
-        {
-            var cmd = new MySqlCommand(
-                @"INSERT INTO refresh_tokens (user_id, token, expires_at)
-                  VALUES (@UserId, @Token, @ExpiresAt)",
-                conn);
-            cmd.Parameters.AddWithValue("@UserId",    userId);
-            cmd.Parameters.AddWithValue("@Token",     token);
-            cmd.Parameters.AddWithValue("@ExpiresAt", DateTime.UtcNow.AddDays(7));
-            cmd.ExecuteNonQuery();
-        }
-
-        private void RevokeRefreshToken(MySqlConnection conn, string token)
-        {
-            var cmd = new MySqlCommand(
-                "UPDATE refresh_tokens SET is_revoked=1 WHERE token=@Token",
-                conn);
-            cmd.Parameters.AddWithValue("@Token", token);
-            cmd.ExecuteNonQuery();
-        }
-
-        private string HashPassword(string password)
-        {
-            using var sha = SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes(password);
-            var hash  = sha.ComputeHash(bytes);
-            return Convert.ToBase64String(hash);
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 
-    // ─── REQUEST DTOs ─────────────────────────────────────────────
-    public record LoginRequest(string Email, string Password);
-    public record AdminLoginRequest(string Login, string Password);
-    public record RefreshRequest(string RefreshToken);
+    public class LoginRequest
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    public class SignupRequest
+    {
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    public class AdminLoginRequest
+    {
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
 }

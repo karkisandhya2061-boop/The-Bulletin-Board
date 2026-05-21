@@ -45,6 +45,20 @@ const INTENT_MAP = {
     keywords: ['opinion', 'editorial', 'analysis', 'commentary', 'column', 'view', 'perspective', 'argument'],
     phrases: ['go to opinion', 'opinion section', 'editorial', 'analysis', 'commentary news'],
     response: "💭 Taking you to Opinion section... You'll see analysis, editorials, and expert commentary."
+  },
+  admin: {
+    section: 'admin',
+    keywords: ['admin', 'administrator', 'console', 'manage', 'dashboard', 'admin panel', 'control room', 'editorial'],
+    phrases: ['go to admin', 'admin section', 'admin console', 'admin panel', 'take me to admin', 'open admin', 'show admin'],
+    response: "🔐 Taking you to Admin Login... You'll need admin credentials to access the control room.",
+    isSpecial: true
+  },
+  search: {
+    section: 'search',
+    keywords: ['search', 'find', 'look for', 'query'],
+    phrases: ['search for', 'find', 'look up', 'search'],
+    response: "🔍 I can help you search! What would you like to find?",
+    isSpecial: true
   }
 };
 
@@ -212,6 +226,16 @@ export const navigateToSection = (section) => {
     return false;
   }
   
+  // Special handling for admin
+  if (section === 'admin') {
+    window.location.hash = '#/auth?tab=admin';
+    const navigationEvent = new CustomEvent('navigate-to-admin', {
+      detail: { section: 'admin' }
+    });
+    window.dispatchEvent(navigationEvent);
+    return true;
+  }
+  
   // Update URL hash for SPA navigation
   window.location.hash = `#/${section}`;
   
@@ -221,6 +245,18 @@ export const navigateToSection = (section) => {
   });
   window.dispatchEvent(navigationEvent);
   
+  return true;
+};
+
+// ─── SEARCH HANDLER ────────────────────────────────────────────────
+/**
+ * Triggers search functionality
+ */
+export const triggerSearch = (query) => {
+  const searchEvent = new CustomEvent('trigger-search', {
+    detail: { query, timestamp: Date.now() }
+  });
+  window.dispatchEvent(searchEvent);
   return true;
 };
 
