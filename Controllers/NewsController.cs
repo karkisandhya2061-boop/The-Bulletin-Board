@@ -21,14 +21,7 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        // ─── PUBLIC CONTENT FEED ──────────────────────────────────
-
-        /// <summary>
-        /// GET /news/feed  — Public
-        /// Returns grouped published content:
-        ///   heroStory (single), featuredSideStories, trendingStories, tickerItems.
-        /// </summary>
+        // Return grouped hero, featured, and trending stories for the homepage
         [HttpGet("feed")]
         public IActionResult GetFeed()
         {
@@ -66,13 +59,7 @@ namespace WebApplication1.Controllers
                 tickerItems = tickers
             });
         }
-
-        // ─── PUBLIC STORY ENDPOINTS ───────────────────────────────
-
-        /// <summary>
-        /// GET /news/stories  — Public
-        /// Published stories only. Optional ?bucket and ?category filters.
-        /// </summary>
+        // Return all published stories with optional filters
         [HttpGet("stories")]
         public IActionResult GetStories(
             [FromQuery] string? bucket = null,
@@ -102,11 +89,7 @@ namespace WebApplication1.Controllers
 
             return Ok(QueryStories(conn, where, parameters, orderBy));
         }
-
-        /// <summary>
-        /// GET /news/stories/{id}  — Public
-        /// Returns 404 for any story that is not status=published.
-        /// </summary>
+        // Return a single published story by ID
         [HttpGet("stories/{id:int}")]
         public IActionResult GetStory(int id)
         {
@@ -118,21 +101,13 @@ namespace WebApplication1.Controllers
 
             return Ok(story);
         }
-
-        /// <summary>
-        /// GET /news/ticker  — Public
-        /// Published ticker items only.
-        /// </summary>
+        // Return published ticker items
         [HttpGet("ticker")]
         public IActionResult GetTicker()
         {
             using var conn = OpenConnection();
             return Ok(QueryTickers(conn, "status = 'published'"));
         }
-
-        // ─── ADMIN STORY ENDPOINTS ────────────────────────────────
-
-        /// <summary>GET /news/admin/stories  [admin] — all statuses, full filters</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/stories")]
         public IActionResult AdminGetStories(
@@ -168,8 +143,6 @@ namespace WebApplication1.Controllers
             return Ok(QueryStories(conn, where, parameters,
                 orderBy: "is_pinned DESC, pin_order ASC, updated_at DESC"));
         }
-
-        /// <summary>GET /news/admin/stories/{id}  [admin] — any status</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/stories/{id:int}")]
         public IActionResult AdminGetStory(int id)
@@ -179,8 +152,7 @@ namespace WebApplication1.Controllers
             if (story == null) return NotFound(new { message = "Story not found." });
             return Ok(story);
         }
-
-        /// <summary>POST /news/admin/stories  [admin]</summary>
+        // Admin: create a new story
         [Authorize(Roles = "admin")]
         [HttpPost("admin/stories")]
         public IActionResult CreateStory([FromBody] CreateStoryRequest req)
@@ -208,8 +180,7 @@ namespace WebApplication1.Controllers
             var newId = Convert.ToInt32(cmd.ExecuteScalar());
             return CreatedAtAction(nameof(AdminGetStory), new { id = newId }, GetStoryById(conn, newId));
         }
-
-        /// <summary>PUT /news/admin/stories/{id}  [admin]</summary>
+        // Admin: update an existing story
         [Authorize(Roles = "admin")]
         [HttpPut("admin/stories/{id:int}")]
         public IActionResult UpdateStory(int id, [FromBody] UpdateStoryRequest req)
@@ -249,8 +220,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetStoryById(conn, id));
         }
-
-        /// <summary>PATCH /news/admin/stories/{id}/status  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/stories/{id:int}/status")]
         public IActionResult PatchStoryStatus(int id, [FromBody] PatchStatusRequest req)
@@ -280,8 +249,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetStoryById(conn, id));
         }
-
-        /// <summary>PATCH /news/admin/stories/{id}/pin  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/stories/{id:int}/pin")]
         public IActionResult PatchStoryPin(int id, [FromBody] PatchPinRequest req)
@@ -302,8 +269,7 @@ namespace WebApplication1.Controllers
 
             return Ok(GetStoryById(conn, id));
         }
-
-        /// <summary>DELETE /news/admin/stories/{id}  [admin]</summary>
+        // Admin: delete a story
         [Authorize(Roles = "admin")]
         [HttpDelete("admin/stories/{id:int}")]
         public IActionResult DeleteStory(int id)
@@ -317,10 +283,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(new { message = "Story deleted." });
         }
-
-        // ─── ADMIN TICKER ENDPOINTS ───────────────────────────────
-
-        /// <summary>GET /news/admin/ticker  [admin] — returns all statuses</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/ticker")]
         public IActionResult AdminGetTicker([FromQuery] string? status = null)
@@ -340,8 +302,6 @@ namespace WebApplication1.Controllers
             while (reader.Read()) list.Add(MapTicker(reader));
             return Ok(list);
         }
-
-        /// <summary>POST /news/admin/ticker  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPost("admin/ticker")]
         public IActionResult CreateTicker([FromBody] CreateTickerItemRequest req)
@@ -359,8 +319,6 @@ namespace WebApplication1.Controllers
             var newId = Convert.ToInt32(cmd.ExecuteScalar());
             return Ok(GetTickerById(conn, newId));
         }
-
-        /// <summary>PUT /news/admin/ticker/{id}  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPut("admin/ticker/{id:int}")]
         public IActionResult UpdateTicker(int id, [FromBody] UpdateTickerItemRequest req)
@@ -381,8 +339,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(GetTickerById(conn, id));
         }
-
-        /// <summary>DELETE /news/admin/ticker/{id}  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpDelete("admin/ticker/{id:int}")]
         public IActionResult DeleteTicker(int id)
@@ -396,8 +352,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(new { message = "Ticker item deleted." });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
 
         private MySqlConnection OpenConnection()
         {
@@ -523,8 +477,241 @@ namespace WebApplication1.Controllers
             UpdatedAt = r.GetDateTime("updated_at"),
         };
     }
-
-    // ─── Request DTOs ─────────────────────────────────────────────
     public record PatchStatusRequest(string Status);
     public record PatchPinRequest(bool IsPinned, int PinOrder);
+    public record ReactionRequest(int? UserId, string UserName, string ReactionType);
+    public record CommentRequest(int? UserId, string UserName, string CommentText);
+}
+namespace WebApplication1.Controllers
+{
+    [ApiController]
+    [Route("news")]
+    public class EngagementController : ControllerBase
+    {
+        private readonly IConfiguration _config;
+
+        public EngagementController(IConfiguration config)
+        {
+            _config = config;
+        }
+
+        private MySqlConnection OpenConnection()
+        {
+            var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
+            conn.Open();
+            return conn;
+        }
+        [HttpPost("{id:int}/reactions")]
+        public IActionResult AddReaction(int id, [FromBody] ReactionRequest request)
+        {
+            using var conn = OpenConnection();
+
+            var checkCmd = new MySqlCommand("SELECT id FROM stories WHERE id = @id", conn);
+            checkCmd.Parameters.AddWithValue("@id", id);
+            if (checkCmd.ExecuteScalar() == null)
+                return NotFound(new { message = "Story not found.", success = false });
+
+            var userId = request.UserId ?? 0;
+
+            // Bug 2 fix: anonymous users (userId=0) are identified by userName only to avoid collisions
+            string existingReactionQuery = userId == 0
+                ? "SELECT reaction_type FROM news_reactions WHERE news_article_id = @newsId AND user_name = @userName AND user_id = 0 LIMIT 1"
+                : "SELECT reaction_type FROM news_reactions WHERE news_article_id = @newsId AND user_id = @userId LIMIT 1";
+
+            string? existingReaction = null;
+            var existingCmd = new MySqlCommand(existingReactionQuery, conn);
+            existingCmd.Parameters.AddWithValue("@newsId", id);
+            existingCmd.Parameters.AddWithValue("@userId", userId);
+            existingCmd.Parameters.AddWithValue("@userName", request.UserName ?? "");
+            using (var r = existingCmd.ExecuteReader())
+                if (r.Read()) existingReaction = r.GetString(0);
+
+            if (existingReaction == request.ReactionType)
+                return Ok(new { message = "Reaction already set.", success = true });
+
+            if (existingReaction == null)
+            {
+                var insertCmd = new MySqlCommand(
+                    "INSERT INTO news_reactions (news_article_id, user_id, reaction_type) VALUES (@newsId, @userId, @reactionType)", conn);
+                insertCmd.Parameters.AddWithValue("@newsId", id);
+                insertCmd.Parameters.AddWithValue("@userId", userId);
+                insertCmd.Parameters.AddWithValue("@reactionType", request.ReactionType);
+                insertCmd.ExecuteNonQuery();
+
+                // Notify admin
+                try
+                {
+                    var notifCmd = new MySqlCommand(
+                        "INSERT INTO admin_notifications (news_article_id, user_id, notification_type, user_name, action_text) VALUES (@newsId, @userId, 'reaction', @userName, @actionText)", conn);
+                    notifCmd.Parameters.AddWithValue("@newsId", id);
+                    notifCmd.Parameters.AddWithValue("@userId", userId);
+                    notifCmd.Parameters.AddWithValue("@userName", request.UserName ?? "User");
+                    notifCmd.Parameters.AddWithValue("@actionText", $"{request.UserName ?? "User"} has reacted");
+                    notifCmd.ExecuteNonQuery();
+                }
+                catch { /* notifications table may not exist yet */ }
+            }
+            else
+            {
+                var updateCmd = new MySqlCommand(
+                    "UPDATE news_reactions SET reaction_type = @reactionType WHERE news_article_id = @newsId AND user_id = @userId", conn);
+                updateCmd.Parameters.AddWithValue("@newsId", id);
+                updateCmd.Parameters.AddWithValue("@userId", userId);
+                updateCmd.Parameters.AddWithValue("@reactionType", request.ReactionType);
+                updateCmd.ExecuteNonQuery();
+            }
+
+            var countCmd = new MySqlCommand(
+                "SELECT reaction_type, COUNT(*) as count FROM news_reactions WHERE news_article_id = @newsId GROUP BY reaction_type", conn);
+            countCmd.Parameters.AddWithValue("@newsId", id);
+            var reactions = new Dictionary<string, int>();
+            using var reader = countCmd.ExecuteReader();
+            while (reader.Read())
+                reactions[reader.GetString("reaction_type")] = Convert.ToInt32(reader["count"]);
+
+            return Ok(new { message = "Reaction added.", success = true, reactions });
+        }
+        // Get all reactions for a story
+        [HttpGet("{id:int}/reactions")]
+        public IActionResult GetReactions(int id)
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand(
+                "SELECT reaction_type, COUNT(*) as count FROM news_reactions WHERE news_article_id = @newsId GROUP BY reaction_type", conn);
+            cmd.Parameters.AddWithValue("@newsId", id);
+            var reactions = new Dictionary<string, int>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                reactions[reader.GetString("reaction_type")] = Convert.ToInt32(reader["count"]);
+            return Ok(new { reactions, success = true });
+        }
+        // Post a comment on a story
+        [HttpPost("{id:int}/comments")]
+        public IActionResult AddComment(int id, [FromBody] CommentRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.CommentText))
+                return BadRequest(new { message = "Comment text is required.", success = false });
+
+            using var conn = OpenConnection();
+
+            var checkCmd = new MySqlCommand("SELECT id FROM stories WHERE id = @id", conn);
+            checkCmd.Parameters.AddWithValue("@id", id);
+            if (checkCmd.ExecuteScalar() == null)
+                return NotFound(new { message = "Story not found.", success = false });
+
+            var insertCmd = new MySqlCommand(
+                "INSERT INTO news_comments (news_article_id, user_id, user_name, comment_text) VALUES (@newsId, @userId, @userName, @commentText)", conn);
+            insertCmd.Parameters.AddWithValue("@newsId", id);
+            insertCmd.Parameters.AddWithValue("@userId", request.UserId ?? 0);
+            insertCmd.Parameters.AddWithValue("@userName", request.UserName ?? "Anonymous");
+            insertCmd.Parameters.AddWithValue("@commentText", request.CommentText);
+            insertCmd.ExecuteNonQuery();
+
+            try
+            {
+                var notifCmd = new MySqlCommand(
+                    "INSERT INTO admin_notifications (news_article_id, user_id, notification_type, user_name, action_text) VALUES (@newsId, @userId, 'comment', @userName, @actionText)", conn);
+                notifCmd.Parameters.AddWithValue("@newsId", id);
+                notifCmd.Parameters.AddWithValue("@userId", request.UserId ?? 0);
+                notifCmd.Parameters.AddWithValue("@userName", request.UserName ?? "Anonymous");
+                notifCmd.Parameters.AddWithValue("@actionText", $"{request.UserName ?? "Anonymous"} commented: {request.CommentText[..Math.Min(50, request.CommentText.Length)]}");
+                notifCmd.ExecuteNonQuery();
+            }
+            catch { /* notifications table may not exist yet */ }
+
+            return Ok(new { message = "Comment added.", success = true });
+        }
+        // Get all comments for a story
+        [HttpGet("{id:int}/comments")]
+        public IActionResult GetComments(int id)
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand(
+                "SELECT id, user_name, comment_text, created_at FROM news_comments WHERE news_article_id = @newsId ORDER BY created_at DESC LIMIT 50", conn);
+            cmd.Parameters.AddWithValue("@newsId", id);
+            var comments = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                comments.Add(new
+                {
+                    id = reader.GetInt32("id"),
+                    userName = reader.GetString("user_name"),
+                    commentText = reader.GetString("comment_text"),
+                    createdAt = reader.GetDateTime("created_at")
+                });
+            return Ok(new { comments, success = true });
+        }
+
+    }
+}
+namespace WebApplication1.Controllers
+{
+    [ApiController]
+    [Route("news/notifications")]
+    public class NotificationsController : ControllerBase
+    {
+        private readonly IConfiguration _config;
+
+        public NotificationsController(IConfiguration config)
+        {
+            _config = config;
+        }
+
+        private MySqlConnection OpenConnection()
+        {
+            var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
+            conn.Open();
+            return conn;
+        }
+        [HttpGet("")]
+        public IActionResult GetNotifications()
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand(
+                "SELECT id, news_article_id, user_id, notification_type, user_name, action_text, is_read, created_at FROM admin_notifications ORDER BY created_at DESC LIMIT 50", conn);
+            var notifications = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                notifications.Add(new
+                {
+                    id = reader.GetInt32("id"),
+                    articleId = reader.GetInt32("news_article_id"),
+                    userId = reader.IsDBNull(reader.GetOrdinal("user_id")) ? (int?)null : reader.GetInt32("user_id"),
+                    type = reader.GetString("notification_type"),
+                    userName = reader.GetString("user_name"),
+                    actionText = reader.GetString("action_text"),
+                    isRead = reader.GetBoolean("is_read"),
+                    createdAt = reader.GetDateTime("created_at")
+                });
+            return Ok(new { notifications, success = true });
+        }
+        [HttpGet("unread-count")]
+        public IActionResult GetUnreadCount()
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand("SELECT COUNT(*) FROM admin_notifications WHERE is_read = FALSE", conn);
+            var count = Convert.ToInt32(cmd.ExecuteScalar());
+            return Ok(new { unreadCount = count, success = true });
+        }
+        [HttpPost("{id:int}/read")]
+        public IActionResult MarkRead(int id)
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand("UPDATE admin_notifications SET is_read = TRUE WHERE id = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            int rowsRead = cmd.ExecuteNonQuery();
+            if (rowsRead == 0) return NotFound(new { message = "Notification not found.", success = false });
+            return Ok(new { message = "Notification marked as read.", success = true });
+        }
+        [HttpDelete("{id:int}")]
+        public IActionResult DeleteNotification(int id)
+        {
+            using var conn = OpenConnection();
+            var cmd = new MySqlCommand("DELETE FROM admin_notifications WHERE id = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            int rowsDeleted = cmd.ExecuteNonQuery();
+            if (rowsDeleted == 0) return NotFound(new { message = "Notification not found.", success = false });
+            return Ok(new { message = "Notification deleted.", success = true });
+        }
+    }
 }

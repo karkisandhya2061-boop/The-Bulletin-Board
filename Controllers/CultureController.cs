@@ -18,10 +18,6 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        // ─── PUBLIC ENDPOINTS ─────────────────────────────────────
-
-        /// <summary>GET /culture/articles — Public, published only</summary>
         [HttpGet("articles")]
         public IActionResult GetArticles()
         {
@@ -29,8 +25,6 @@ namespace WebApplication1.Controllers
             return Ok(QueryArticles(conn, "status = 'published'",
                 orderBy: "is_pinned DESC, pin_order ASC, published_at DESC"));
         }
-
-        /// <summary>GET /culture/articles/{id} — Public, published only</summary>
         [HttpGet("articles/{id:int}")]
         public IActionResult GetArticle(int id)
         {
@@ -40,10 +34,6 @@ namespace WebApplication1.Controllers
                 return NotFound(new { message = "Article not found." });
             return Ok(article);
         }
-
-        // ─── ADMIN ENDPOINTS ──────────────────────────────────────
-
-        /// <summary>GET /culture/admin/articles — Admin, all statuses</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/articles")]
         public IActionResult AdminGetArticles([FromQuery] string? status = null)
@@ -63,8 +53,6 @@ namespace WebApplication1.Controllers
             while (reader.Read()) list.Add(MapArticle(reader));
             return Ok(list);
         }
-
-        /// <summary>GET /culture/admin/articles/{id} — Admin, any status</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/articles/{id:int}")]
         public IActionResult AdminGetArticle(int id)
@@ -74,8 +62,6 @@ namespace WebApplication1.Controllers
             if (article == null) return NotFound(new { message = "Article not found." });
             return Ok(article);
         }
-
-        /// <summary>POST /culture/admin/articles — Admin</summary>
         [Authorize(Roles = "admin")]
         [HttpPost("admin/articles")]
         public IActionResult CreateArticle([FromBody] CreateCultureStoryRequest req)
@@ -97,8 +83,6 @@ namespace WebApplication1.Controllers
             var newId = Convert.ToInt32(cmd.ExecuteScalar());
             return CreatedAtAction(nameof(AdminGetArticle), new { id = newId }, GetArticleById(conn, newId));
         }
-
-        /// <summary>PUT /culture/admin/articles/{id} — Admin</summary>
         [Authorize(Roles = "admin")]
         [HttpPut("admin/articles/{id:int}")]
         public IActionResult UpdateArticle(int id, [FromBody] UpdateCultureStoryRequest req)
@@ -129,8 +113,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>PATCH /culture/admin/articles/{id}/status — Admin</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/articles/{id:int}/status")]
         public IActionResult PatchStatus(int id, [FromBody] PatchStatusRequest req)
@@ -156,8 +138,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>PATCH /culture/admin/articles/{id}/pin — Admin</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/articles/{id:int}/pin")]
         public IActionResult PatchPin(int id, [FromBody] PatchPinRequest req)
@@ -177,8 +157,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>DELETE /culture/admin/articles/{id} — Admin</summary>
         [Authorize(Roles = "admin")]
         [HttpDelete("admin/articles/{id:int}")]
         public IActionResult DeleteArticle(int id)
@@ -192,8 +170,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(new { message = "Article deleted." });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
 
         private MySqlConnection OpenConnection()
         {

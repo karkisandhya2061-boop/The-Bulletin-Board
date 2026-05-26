@@ -5,11 +5,6 @@ using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
-    /// <summary>
-    /// Admin content management — stories.
-    /// All endpoints require a valid JWT with role = "admin".
-    /// Base route: /api/v1/admin/content
-    /// </summary>
     [ApiController]
     [Route("api/v1/admin/content")]
     [Authorize(Roles = "admin")]
@@ -21,12 +16,6 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        // ─── CREATE ───────────────────────────────────────────────
-        /// <summary>
-        /// POST /api/v1/admin/content/stories
-        /// Creates a new story. If isHero=true the previous hero is demoted to draft.
-        /// </summary>
         [HttpPost("stories")]
         public IActionResult CreateStory([FromBody] ContentStoryRequest req)
         {
@@ -53,8 +42,6 @@ namespace WebApplication1.Controllers
                 new { id = newId },
                 FetchById(conn, newId));
         }
-
-        // ─── READ (single — used by CreatedAtAction) ──────────────
         [HttpGet("stories/{id:int}")]
         public IActionResult GetStory(int id)
         {
@@ -64,12 +51,6 @@ namespace WebApplication1.Controllers
                 ? NotFound(new { message = "Story not found." })
                 : Ok(story);
         }
-
-        // ─── UPDATE ───────────────────────────────────────────────
-        /// <summary>
-        /// PUT /api/v1/admin/content/stories/:id
-        /// Full replacement update. If isHero=true and status=published the old hero is demoted.
-        /// </summary>
         [HttpPut("stories/{id:int}")]
         public IActionResult UpdateStory(int id, [FromBody] ContentStoryRequest req)
         {
@@ -102,9 +83,6 @@ namespace WebApplication1.Controllers
 
             return Ok(FetchById(conn, id));
         }
-
-        // ─── DELETE ───────────────────────────────────────────────
-        /// <summary>DELETE /api/v1/admin/content/stories/:id</summary>
         [HttpDelete("stories/{id:int}")]
         public IActionResult DeleteStory(int id)
         {
@@ -119,12 +97,6 @@ namespace WebApplication1.Controllers
 
             return Ok(new { message = "Story deleted successfully." });
         }
-
-        // ─── PUBLISH ──────────────────────────────────────────────
-        /// <summary>
-        /// PATCH /api/v1/admin/content/stories/:id/publish
-        /// Sets status = published. If the story is a hero, demotes the current hero first.
-        /// </summary>
         [HttpPatch("stories/{id:int}/publish")]
         public IActionResult PublishStory(int id)
         {
@@ -141,12 +113,6 @@ namespace WebApplication1.Controllers
             SetStatus(conn, id, "published");
             return Ok(FetchById(conn, id));
         }
-
-        // ─── UNPUBLISH ────────────────────────────────────────────
-        /// <summary>
-        /// PATCH /api/v1/admin/content/stories/:id/unpublish
-        /// Sets status = draft.
-        /// </summary>
         [HttpPatch("stories/{id:int}/unpublish")]
         public IActionResult UnpublishStory(int id)
         {
@@ -159,19 +125,12 @@ namespace WebApplication1.Controllers
             return Ok(FetchById(conn, id));
         }
 
-        // ─── HELPERS ─────────────────────────────────────────────
-
         private MySqlConnection OpenConnection()
         {
             var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
             conn.Open();
             return conn;
         }
-
-        /// <summary>
-        /// Ensures only one hero can be published at a time.
-        /// Demotes any currently published hero to draft (excluding the story being set as hero).
-        /// </summary>
         private static void DemoteCurrentHero(MySqlConnection conn, int excludeId = 0)
         {
             var cmd = new MySqlCommand(@"

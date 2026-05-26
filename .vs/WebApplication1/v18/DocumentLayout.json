@@ -1,0 +1,249 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\services\\aiservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:services\\aiservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\chatcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\chatcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\middleware\\chatratelimitmiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:middleware\\chatratelimitmiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\imagecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\imagecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\searchcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\searchcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\newscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\newscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\models\\story.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:models\\story.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\models\\chatmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:models\\chatmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\contentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\contentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|c:\\users\\asus\\downloads\\newportal_updated (1)\\final_newportal\\webapplication1\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{19317912-AC4B-45A3-1276-85453B678B5B}|WebApplication1.csproj|solutionrelative:appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\asus\\source\\repos\\LoginSignup\\WebApplication1\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AiService.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Services\\AiService.cs",
+              "RelativeDocumentMoniker": "Services\\AiService.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Services\\AiService.cs",
+              "RelativeToolTip": "Services\\AiService.cs",
+              "ViewState": "AgIAABcAAAAAAAAAAAAuwCsAAABZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-18T08:40:00.353Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ChatRateLimitMiddleware.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Middleware\\ChatRateLimitMiddleware.cs",
+              "RelativeDocumentMoniker": "Middleware\\ChatRateLimitMiddleware.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Middleware\\ChatRateLimitMiddleware.cs",
+              "RelativeToolTip": "Middleware\\ChatRateLimitMiddleware.cs",
+              "ViewState": "AgIAAAsAAAAAAAAAAAAAwD4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-18T08:41:12.74Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAHIAAAAAAAAAAAAAAA0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-12T14:16:20.515Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ChatController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ChatController.cs",
+              "RelativeDocumentMoniker": "Controllers\\ChatController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ChatController.cs",
+              "RelativeToolTip": "Controllers\\ChatController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-18T08:39:15.095Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\appsettings.json",
+              "RelativeDocumentMoniker": "appsettings.json",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\appsettings.json",
+              "RelativeToolTip": "appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-05-12T14:14:36.022Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ImageController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ImageController.cs",
+              "RelativeDocumentMoniker": "Controllers\\ImageController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ImageController.cs",
+              "RelativeToolTip": "Controllers\\ImageController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-25T13:39:16.387Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "NewsController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\NewsController.cs",
+              "RelativeDocumentMoniker": "Controllers\\NewsController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\NewsController.cs",
+              "RelativeToolTip": "Controllers\\NewsController.cs",
+              "ViewState": "AgIAAPoBAAAAAAAAAAAswBECAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-20T14:02:35.723Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "SearchController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\SearchController.cs",
+              "RelativeDocumentMoniker": "Controllers\\SearchController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\SearchController.cs",
+              "RelativeToolTip": "Controllers\\SearchController.cs",
+              "ViewState": "AgIAAC4AAAAAAAAAAAAswEUAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-20T14:03:10.078Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Story.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Models\\Story.cs",
+              "RelativeDocumentMoniker": "Models\\Story.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Models\\Story.cs",
+              "RelativeToolTip": "Models\\Story.cs",
+              "ViewState": "AgIAACkAAAAAAAAAAAA8wC4AAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-20T14:01:43.561Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "ChatModels.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Models\\ChatModels.cs",
+              "RelativeDocumentMoniker": "Models\\ChatModels.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Models\\ChatModels.cs",
+              "RelativeToolTip": "Models\\ChatModels.cs",
+              "ViewState": "AgIAABIAAAAAAAAAAAA2wC8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-18T08:40:25.681Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "ContentController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ContentController.cs",
+              "RelativeDocumentMoniker": "Controllers\\ContentController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\ContentController.cs",
+              "RelativeToolTip": "Controllers\\ContentController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-12T14:17:01.517Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "Controllers\\AuthController.cs",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "Controllers\\AuthController.cs",
+              "ViewState": "AgIAANMAAAAAAAAAAAAiwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-12T14:16:49.982Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "appsettings.Development.json",
+              "DocumentMoniker": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\appsettings.Development.json",
+              "RelativeDocumentMoniker": "appsettings.Development.json",
+              "ToolTip": "C:\\Users\\asus\\Downloads\\newportal_updated (1)\\final_newportal\\WebApplication1\\appsettings.Development.json",
+              "RelativeToolTip": "appsettings.Development.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-05-12T14:15:55.579Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\asus\\source\\repos\\LoginSignup\\WebApplication1\\appsettings.json",
+              "RelativeDocumentMoniker": "..\\..\\..\\..\\source\\repos\\LoginSignup\\WebApplication1\\appsettings.json",
+              "ToolTip": "C:\\Users\\asus\\source\\repos\\LoginSignup\\WebApplication1\\appsettings.json",
+              "RelativeToolTip": "..\\..\\..\\..\\source\\repos\\LoginSignup\\WebApplication1\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAADAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-05-12T14:15:04.947Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

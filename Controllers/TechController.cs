@@ -5,10 +5,6 @@ using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
-    /// <summary>
-    /// Tech category navigation — public feed and story endpoints.
-    /// Base route: /tech
-    /// </summary>
     [ApiController]
     [Route("tech")]
     public class TechController : ControllerBase
@@ -20,13 +16,6 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        // ─── PUBLIC: TECH FEED ────────────────────────────────────
-        /// <summary>
-        /// GET /tech/feed
-        /// Returns grouped published Tech stories:
-        ///   heroStory (single), featuredSideStories, trendingStories.
-        /// </summary>
         [HttpGet("feed")]
         public IActionResult GetTechFeed()
         {
@@ -61,12 +50,6 @@ namespace WebApplication1.Controllers
                 TrendingStories = trending
             });
         }
-
-        // ─── PUBLIC: LIST TECH STORIES ────────────────────────────
-        /// <summary>
-        /// GET /tech/stories
-        /// Returns all published Tech stories. Optional ?bucket filter.
-        /// </summary>
         [HttpGet("stories")]
         public IActionResult GetTechStories([FromQuery] string? bucket = null)
         {
@@ -92,12 +75,6 @@ namespace WebApplication1.Controllers
 
             return Ok(QueryTechStories(conn, where, parameters, orderBy));
         }
-
-        // ─── PUBLIC: SINGLE TECH STORY ────────────────────────────
-        /// <summary>
-        /// GET /tech/stories/{id}
-        /// Returns a single published Tech story. Returns 404 if not found or not tech category.
-        /// </summary>
         [HttpGet("stories/{id:int}")]
         public IActionResult GetTechStory(int id)
         {
@@ -109,12 +86,6 @@ namespace WebApplication1.Controllers
 
             return Ok(story);
         }
-
-        // ─── ADMIN: CREATE TECH STORY ─────────────────────────────
-        /// <summary>
-        /// POST /tech/admin/stories  [admin]
-        /// Creates a new Tech story. Category is automatically set to "tech".
-        /// </summary>
         [Authorize(Roles = "admin")]
         [HttpPost("admin/stories")]
         public IActionResult CreateTechStory([FromBody] CreateStoryRequest req)
@@ -147,11 +118,6 @@ namespace WebApplication1.Controllers
 
             return CreatedAtAction(nameof(GetTechStory), new { id = newId }, GetById(conn, newId));
         }
-
-        // ─── ADMIN: UPDATE TECH STORY ─────────────────────────────
-        /// <summary>
-        /// PUT /tech/admin/stories/{id}  [admin]
-        /// </summary>
         [Authorize(Roles = "admin")]
         [HttpPut("admin/stories/{id:int}")]
         public IActionResult UpdateTechStory(int id, [FromBody] CreateStoryRequest req)
@@ -185,11 +151,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetById(conn, id));
         }
-
-        // ─── ADMIN: DELETE TECH STORY ─────────────────────────────
-        /// <summary>
-        /// DELETE /tech/admin/stories/{id}  [admin]
-        /// </summary>
         [Authorize(Roles = "admin")]
         [HttpDelete("admin/stories/{id:int}")]
         public IActionResult DeleteTechStory(int id)
@@ -204,8 +165,6 @@ namespace WebApplication1.Controllers
 
             return Ok(new { message = "Tech story deleted." });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
 
         private MySqlConnection OpenConnection()
         {

@@ -14,11 +14,7 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        /// <summary>
-        /// GET /search?q=keyword
-        /// Searches published stories across all categories by title, excerpt, content, author.
-        /// </summary>
+        // Search published stories by keyword across title, content, and author
         [HttpGet]
         public IActionResult Search([FromQuery] string? q)
         {

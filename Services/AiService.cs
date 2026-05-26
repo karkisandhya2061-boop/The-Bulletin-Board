@@ -1,10 +1,10 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 
 namespace WebApplication1.Services
 {
     /// <summary>
-    /// Wraps the Google Gemini API (generateContent endpoint).
+    /// Wraps the DeepSeek API (OpenAI-compatible chat/completions endpoint).
     /// Configured via appsettings: Ai:ApiKey, Ai:Model, Ai:MaxTokens, Ai:SystemPrompt
     /// </summary>
     public class AiService
@@ -21,44 +21,41 @@ namespace WebApplication1.Services
         }
 
         /// <summary>
-        /// Sends a conversation history to Gemini and returns the assistant reply text.
+        /// Sends a conversation history to DeepSeek and returns the assistant reply text.
         /// </summary>
         public async Task<string> ChatAsync(
             IEnumerable<AiMessage> messages,
             CancellationToken cancellationToken = default)
         {
             var aiSettings = _config.GetSection("Ai");
-            var model = aiSettings["Model"] ?? "gemini-1.5-flash";
-            var maxTokens = int.Parse(aiSettings["MaxTokens"] ?? "1024");
-            var apiKey = aiSettings["ApiKey"] ?? "";
+            var model      = aiSettings["Model"]     ?? "deepseek-chat";
+            var maxTokens  = int.Parse(aiSettings["MaxTokens"] ?? "1024");
+            var apiKey     = aiSettings["ApiKey"]    ?? "";
             var systemPrompt = aiSettings["SystemPrompt"]
                 ?? "You are a helpful news assistant for a college news portal. Answer questions about news, summarise stories, and help users find relevant content. Be concise and factual.";
 
-            // Gemini endpoint — API key passed as query param
-            var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
+            const string endpoint = "https://api.deepseek.com/chat/completions";
 
-            // Gemini uses "user" and "model" roles (not "assistant")
-            var geminiContents = messages.Select(m => new
+            // Build messages array — prepend system message
+            var messageList = new List<object>
             {
-                role = m.Role == "assistant" ? "model" : "user",
-                parts = new[] { new { text = m.Content } }
-            });
+                new { role = "system", content = systemPrompt }
+            };
+            messageList.AddRange(messages.Select(m => new { role = m.Role, content = m.Content }));
 
             var payload = new
             {
-                system_instruction = new
-                {
-                    parts = new[] { new { text = systemPrompt } }
-                },
-                contents = geminiContents,
-                generationConfig = new { maxOutputTokens = maxTokens }
+                model,
+                messages  = messageList,
+                max_tokens = maxTokens
             };
 
-            var json = JsonSerializer.Serialize(payload);
+            var json    = JsonSerializer.Serialize(payload);
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
+            request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
             HttpResponseMessage response;
             try
@@ -67,7 +64,7 @@ namespace WebApplication1.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "HTTP error calling Gemini API");
+                _logger.LogError(ex, "HTTP error calling DeepSeek API");
                 throw new InvalidOperationException("AI provider unreachable.", ex);
             }
 
@@ -75,22 +72,21 @@ namespace WebApplication1.Services
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Gemini API error {Status}: {Body}", response.StatusCode, responseBody);
+                _logger.LogError("DeepSeek API error {Status}: {Body}", response.StatusCode, responseBody);
                 throw new InvalidOperationException($"AI provider returned {(int)response.StatusCode}.");
             }
 
-            // Parse: { candidates: [ { content: { parts: [ { text: "..." } ] } } ] }
+            // Parse OpenAI-compatible response:
+            // { choices: [ { message: { role: "assistant", content: "..." } } ] }
             using var doc = JsonDocument.Parse(responseBody);
-            var candidates = doc.RootElement.GetProperty("candidates");
+            var choices = doc.RootElement.GetProperty("choices");
 
-            if (candidates.GetArrayLength() > 0)
+            if (choices.GetArrayLength() > 0)
             {
-                var parts = candidates[0]
+                return choices[0]
+                    .GetProperty("message")
                     .GetProperty("content")
-                    .GetProperty("parts");
-
-                if (parts.GetArrayLength() > 0)
-                    return parts[0].GetProperty("text").GetString() ?? string.Empty;
+                    .GetString() ?? string.Empty;
             }
 
             return string.Empty;

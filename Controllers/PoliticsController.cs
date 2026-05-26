@@ -18,15 +18,8 @@ namespace WebApplication1.Controllers
         {
             _config = config;
         }
-
-        // ─── PUBLIC ENDPOINTS ────────────────────────────────────
-
-        /// <summary>
-        /// GET /politics/articles  — Public
-        /// Returns published politics articles.
-        /// Optional filters: ?featured=true, ?tag=&lt;tag&gt;, ?author=&lt;author&gt;
-        /// Featured articles are returned first, then latest published_at DESC.
-        /// </summary>
+        // Return published politics articles with optional filters
+        // Return a single published politics article
         [HttpGet("articles")]
         public IActionResult GetArticles(
             [FromQuery] bool? featured = null,
@@ -60,11 +53,6 @@ namespace WebApplication1.Controllers
             return Ok(QueryArticles(conn, where, parameters,
                 orderBy: "is_featured DESC, is_pinned DESC, pin_order ASC, published_at DESC, created_at DESC"));
         }
-
-        /// <summary>
-        /// GET /politics/articles/{id}  — Public
-        /// Returns 404 for any article that is not status=published.
-        /// </summary>
         [HttpGet("articles/{id:int}")]
         public IActionResult GetArticle(int id)
         {
@@ -76,11 +64,7 @@ namespace WebApplication1.Controllers
 
             return Ok(article);
         }
-
-        /// <summary>
-        /// GET /politics/featured  — Public
-        /// Returns the single most-recently-published featured article.
-        /// </summary>
+        // Return the latest featured politics article
         [HttpGet("featured")]
         public IActionResult GetFeatured()
         {
@@ -96,10 +80,7 @@ namespace WebApplication1.Controllers
 
             return Ok(top);
         }
-
-        // ─── ADMIN ENDPOINTS ─────────────────────────────────────
-
-        /// <summary>GET /politics/admin/articles  [admin] — all statuses, full filters</summary>
+        // Admin: get all politics articles
         [Authorize(Roles = "admin")]
         [HttpGet("admin/articles")]
         public IActionResult AdminGetArticles(
@@ -141,8 +122,6 @@ namespace WebApplication1.Controllers
             return Ok(QueryArticles(conn, where, parameters,
                 orderBy: "is_featured DESC, is_pinned DESC, pin_order ASC, updated_at DESC"));
         }
-
-        /// <summary>GET /politics/admin/articles/{id}  [admin] — any status</summary>
         [Authorize(Roles = "admin")]
         [HttpGet("admin/articles/{id:int}")]
         public IActionResult AdminGetArticle(int id)
@@ -152,8 +131,6 @@ namespace WebApplication1.Controllers
             if (article == null) return NotFound(new { message = "Article not found." });
             return Ok(article);
         }
-
-        /// <summary>POST /politics/admin/articles  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPost("admin/articles")]
         public IActionResult CreateArticle([FromBody] CreatePoliticsArticleRequest req)
@@ -183,8 +160,6 @@ namespace WebApplication1.Controllers
             var newId = Convert.ToInt32(cmd.ExecuteScalar());
             return CreatedAtAction(nameof(AdminGetArticle), new { id = newId }, GetArticleById(conn, newId));
         }
-
-        /// <summary>PUT /politics/admin/articles/{id}  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPut("admin/articles/{id:int}")]
         public IActionResult UpdateArticle(int id, [FromBody] UpdatePoliticsArticleRequest req)
@@ -223,8 +198,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>PATCH /politics/admin/articles/{id}/status  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/articles/{id:int}/status")]
         public IActionResult PatchArticleStatus(int id, [FromBody] PatchPoliticsStatusRequest req)
@@ -257,11 +230,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>
-        /// PATCH /politics/admin/articles/{id}/pin  [admin]
-        /// Sets is_pinned and pin_order. Bumps updated_at.
-        /// </summary>
         [Authorize(Roles = "admin")]
         [HttpPatch("admin/articles/{id:int}/pin")]
         public IActionResult PatchArticlePin(int id, [FromBody] PatchPoliticsPinRequest req)
@@ -282,8 +250,6 @@ namespace WebApplication1.Controllers
 
             return Ok(GetArticleById(conn, id));
         }
-
-        /// <summary>DELETE /politics/admin/articles/{id}  [admin]</summary>
         [Authorize(Roles = "admin")]
         [HttpDelete("admin/articles/{id:int}")]
         public IActionResult DeleteArticle(int id)
@@ -297,8 +263,6 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
             return Ok(new { message = "Article deleted." });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
 
         private MySqlConnection OpenConnection()
         {
@@ -391,8 +355,6 @@ namespace WebApplication1.Controllers
             UpdatedAt = r.GetDateTime("updated_at"),
         };
     }
-
-    // ─── Request DTOs ─────────────────────────────────────────────
     public record PatchPoliticsStatusRequest(string Status);
     public record PatchPoliticsPinRequest(bool IsPinned, int PinOrder);
 }

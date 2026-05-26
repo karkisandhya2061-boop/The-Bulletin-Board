@@ -16,23 +16,15 @@ namespace WebApplication1.Controllers
         private readonly IConfiguration _config;
         private readonly JwtService _jwt;
 
-        // BUG 1 FIX — PBKDF2 constants (replaces plain SHA-256 with no salt)
-        private const int SaltSize = 16;   // bytes
-        private const int HashSize = 32;   // bytes  (256-bit output)
-        private const int Pbkdf2Iterations = 100_000;
-
         public AuthController(IConfiguration config, JwtService jwt)
         {
             _config = config;
             _jwt = jwt;
         }
-
-        // ─── SIGNUP ───────────────────────────────────────────────
+        // Register a new user account
         [HttpPost("signup")]
         public IActionResult Signup([FromBody] User user)
         {
-            // BUG 1 FIX: HashPassword now returns "salt:hash" (both Base64).
-            // Two users with the same password produce different stored values.
             string hashedPassword = HashPassword(user.Password);
 
             using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
@@ -45,50 +37,44 @@ namespace WebApplication1.Controllers
 
             var cmd = new MySqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@FirstName", user.FirstName);
-            cmd.Parameters.AddWithValue("@LastName", user.LastName);
-            cmd.Parameters.AddWithValue("@Email", user.Email);
-            cmd.Parameters.AddWithValue("@Phone", user.Phone);
-            cmd.Parameters.AddWithValue("@Address", user.Address);
-            cmd.Parameters.AddWithValue("@Country", user.Country);
-            cmd.Parameters.AddWithValue("@Password", hashedPassword);
-            cmd.Parameters.AddWithValue("@Role", user.Role ?? "user");
+            cmd.Parameters.AddWithValue("@LastName",  user.LastName);
+            cmd.Parameters.AddWithValue("@Email",     user.Email);
+            cmd.Parameters.AddWithValue("@Phone",     user.Phone);
+            cmd.Parameters.AddWithValue("@Address",   user.Address);
+            cmd.Parameters.AddWithValue("@Country",   user.Country);
+            cmd.Parameters.AddWithValue("@Password",  hashedPassword);
+            cmd.Parameters.AddWithValue("@Role",      user.Role ?? "user");
 
-            try { cmd.ExecuteNonQuery(); }
-            catch (MySqlException) { return Conflict(new { message = "Email already exists." }); }
+            try   { cmd.ExecuteNonQuery(); }
+            catch (MySqlException ex) when (ex.Number == 1062) { return Conflict(new { message = "Email already exists." }); }
 
             return Ok(new { message = "User registered successfully." });
         }
-
-        // ─── LOGIN ────────────────────────────────────────────────
+        // Log in and return JWT + refresh token
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest req)
         {
+            string hashedPassword = HashPassword(req.Password);
+
             using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
             conn.Open();
 
-            // BUG 1 FIX: Fetch the stored "salt:hash" string, then verify via PBKDF2.
-            // We can no longer do a hash-in-SQL comparison; fetch the row by email only,
-            // then verify the password in application code.
             var cmd = new MySqlCommand(
-                "SELECT id, email, role, password FROM users WHERE email=@Email AND is_active=1",
+                "SELECT id, email, role FROM users WHERE email=@Email AND password=@Password AND is_active=1",
                 conn);
-            cmd.Parameters.AddWithValue("@Email", req.Email);
+            cmd.Parameters.AddWithValue("@Email",    req.Email);
+            cmd.Parameters.AddWithValue("@Password", hashedPassword);
 
             using var reader = cmd.ExecuteReader();
             if (!reader.Read())
                 return Unauthorized(new { message = "Invalid credentials." });
 
             var userId = Convert.ToInt32(reader["id"]);
-            var email = reader["email"].ToString()!;
-            var role = reader["role"].ToString()!;
-            var storedPassword = reader["password"].ToString()!;
+            var email  = reader["email"].ToString()!;
+            var role   = reader["role"].ToString()!;
             reader.Close();
 
-            // BUG 1 FIX: Constant-time PBKDF2 verification
-            if (!VerifyPassword(req.Password, storedPassword))
-                return Unauthorized(new { message = "Invalid credentials." });
-
-            var accessToken = _jwt.GenerateToken(userId, email, role);
+            var accessToken  = _jwt.GenerateToken(userId, email, role);
             var refreshToken = _jwt.GenerateRefreshToken();
             SaveRefreshToken(conn, userId, refreshToken);
 
@@ -100,36 +86,33 @@ namespace WebApplication1.Controllers
                 user = new { userId, email, role }
             });
         }
-
-        // ─── ADMIN LOGIN ──────────────────────────────────────────
+        // Admin-only login with role check
         [HttpPost("admin-login")]
         public IActionResult AdminLogin([FromBody] AdminLoginRequest req)
         {
+            string hashedPassword = HashPassword(req.Password);
+
             using var conn = new MySqlConnection(_config.GetConnectionString("DefaultConnection"));
             conn.Open();
 
-            // BUG 1 FIX: Same pattern — fetch by identity, verify password in code.
             var cmd = new MySqlCommand(
-                @"SELECT id, email, role, password FROM users 
+                @"SELECT id, email, role FROM users 
                   WHERE (email=@Login OR username=@Login) 
-                  AND role='admin' AND is_active=1",
+                  AND password=@Password AND role='admin' AND is_active=1",
                 conn);
-            cmd.Parameters.AddWithValue("@Login", req.Login);
+            cmd.Parameters.AddWithValue("@Login",    req.Login);
+            cmd.Parameters.AddWithValue("@Password", hashedPassword);
 
             using var reader = cmd.ExecuteReader();
             if (!reader.Read())
                 return Unauthorized(new { message = "Invalid admin credentials." });
 
             var userId = Convert.ToInt32(reader["id"]);
-            var email = reader["email"].ToString()!;
-            var role = reader["role"].ToString()!;
-            var storedPassword = reader["password"].ToString()!;
+            var email  = reader["email"].ToString()!;
+            var role   = reader["role"].ToString()!;
             reader.Close();
 
-            if (!VerifyPassword(req.Password, storedPassword))
-                return Unauthorized(new { message = "Invalid admin credentials." });
-
-            var accessToken = _jwt.GenerateToken(userId, email, role);
+            var accessToken  = _jwt.GenerateToken(userId, email, role);
             var refreshToken = _jwt.GenerateRefreshToken();
             SaveRefreshToken(conn, userId, refreshToken);
 
@@ -141,8 +124,7 @@ namespace WebApplication1.Controllers
                 user = new { userId, email, role }
             });
         }
-
-        // ─── REFRESH ──────────────────────────────────────────────
+        // Exchange a refresh token for a new access token
         [HttpPost("refresh")]
         public IActionResult Refresh([FromBody] RefreshRequest req)
         {
@@ -164,24 +146,23 @@ namespace WebApplication1.Controllers
                 return Unauthorized(new { message = "Invalid or expired refresh token." });
 
             var userId = Convert.ToInt32(reader["user_id"]);
-            var email = reader["email"].ToString()!;
-            var role = reader["role"].ToString()!;
+            var email  = reader["email"].ToString()!;
+            var role   = reader["role"].ToString()!;
             reader.Close();
 
             RevokeRefreshToken(conn, req.RefreshToken);
-            var newAccessToken = _jwt.GenerateToken(userId, email, role);
+            var newAccessToken  = _jwt.GenerateToken(userId, email, role);
             var newRefreshToken = _jwt.GenerateRefreshToken();
             SaveRefreshToken(conn, userId, newRefreshToken);
 
             return Ok(new
             {
-                accessToken = newAccessToken,
+                accessToken  = newAccessToken,
                 refreshToken = newRefreshToken,
                 expiresInSeconds = 3600
             });
         }
-
-        // ─── LOGOUT ───────────────────────────────────────────────
+        // Revoke the refresh token on logout
         [HttpPost("logout")]
         public IActionResult Logout([FromBody] RefreshRequest req)
         {
@@ -190,31 +171,30 @@ namespace WebApplication1.Controllers
             RevokeRefreshToken(conn, req.RefreshToken);
             return Ok(new { message = "Logged out successfully." });
         }
-
-        // ─── ME ───────────────────────────────────────────────────
+        // Return the logged-in user's profile
         [Authorize]
         [HttpGet("me")]
         public IActionResult Me()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var email = User.FindFirstValue(ClaimTypes.Email);
-            var role = User.FindFirstValue(ClaimTypes.Role);
+            var email  = User.FindFirstValue(ClaimTypes.Email);
+            var role   = User.FindFirstValue(ClaimTypes.Role);
             return Ok(new { userId, email, role });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
+        // Save refresh token to the database
         private void SaveRefreshToken(MySqlConnection conn, int userId, string token)
         {
             var cmd = new MySqlCommand(
                 @"INSERT INTO refresh_tokens (user_id, token, expires_at)
                   VALUES (@UserId, @Token, @ExpiresAt)",
                 conn);
-            cmd.Parameters.AddWithValue("@UserId", userId);
-            cmd.Parameters.AddWithValue("@Token", token);
+            cmd.Parameters.AddWithValue("@UserId",    userId);
+            cmd.Parameters.AddWithValue("@Token",     token);
             cmd.Parameters.AddWithValue("@ExpiresAt", DateTime.UtcNow.AddDays(7));
             cmd.ExecuteNonQuery();
         }
 
+        // Mark a refresh token as revoked
         private void RevokeRefreshToken(MySqlConnection conn, string token)
         {
             var cmd = new MySqlCommand(
@@ -224,52 +204,14 @@ namespace WebApplication1.Controllers
             cmd.ExecuteNonQuery();
         }
 
-        // ─── BUG 1 FIX: PBKDF2 with random salt ─────────────────
-        // Stored format:  "<saltBase64>:<hashBase64>"
-        // Both parts are needed to verify a login attempt.
-        private static string HashPassword(string password)
+        private string HashPassword(string password)
         {
-            // Generate a cryptographically-random salt per user
-            var salt = RandomNumberGenerator.GetBytes(SaltSize);
-
-            var hash = Rfc2898DeriveBytes.Pbkdf2(
-                password: password,
-                salt: salt,
-                iterations: Pbkdf2Iterations,
-                hashAlgorithm: HashAlgorithmName.SHA256,
-                outputLength: HashSize);
-
-            return $"{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
-        }
-
-        private static bool VerifyPassword(string password, string stored)
-        {
-            // stored must be "saltBase64:hashBase64"
-            var parts = stored.Split(':', 2);
-            if (parts.Length != 2) return false;
-
-            byte[] salt;
-            byte[] expectedHash;
-            try
-            {
-                salt = Convert.FromBase64String(parts[0]);
-                expectedHash = Convert.FromBase64String(parts[1]);
-            }
-            catch { return false; }
-
-            var actualHash = Rfc2898DeriveBytes.Pbkdf2(
-                password: password,
-                salt: salt,
-                iterations: Pbkdf2Iterations,
-                hashAlgorithm: HashAlgorithmName.SHA256,
-                outputLength: HashSize);
-
-            // CryptographicOperations.FixedTimeEquals prevents timing attacks
-            return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+            using var sha = SHA256.Create();
+            var bytes = Encoding.UTF8.GetBytes(password);
+            var hash  = sha.ComputeHash(bytes);
+            return Convert.ToBase64String(hash);
         }
     }
-
-    // ─── REQUEST DTOs ─────────────────────────────────────────────
     public record LoginRequest(string Email, string Password);
     public record AdminLoginRequest(string Login, string Password);
     public record RefreshRequest(string RefreshToken);

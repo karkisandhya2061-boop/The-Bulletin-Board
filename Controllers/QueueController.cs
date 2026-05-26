@@ -5,10 +5,6 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
-    /// <summary>
-    /// Editorial queue — admin-only CRUD.
-    /// Base route: /api/v1/admin/queue
-    /// </summary>
     [ApiController]
     [Route("api/v1/admin/queue")]
     [Authorize(Roles = "admin")]
@@ -23,14 +19,8 @@ namespace WebApplication1.Controllers
         {
             _store = store;
         }
-
-        // ─── GET /api/v1/admin/queue ──────────────────────────────
-        /// <summary>Returns all queue items, sorted high → normal → low priority.</summary>
         [HttpGet]
         public IActionResult GetAll() => Ok(_store.GetAll());
-
-        // ─── POST /api/v1/admin/queue ─────────────────────────────
-        /// <summary>Creates a new queue item.</summary>
         [HttpPost]
         public IActionResult Create([FromBody] QueueItemRequest req)
         {
@@ -40,9 +30,6 @@ namespace WebApplication1.Controllers
             var item = _store.Add(req);
             return CreatedAtAction(nameof(GetAll), new { id = item.Id }, item);
         }
-
-        // ─── PUT /api/v1/admin/queue/:id ──────────────────────────
-        /// <summary>Fully updates a queue item (title, priority, status).</summary>
         [HttpPut("{id:int}")]
         public IActionResult Update(int id, [FromBody] QueueItemRequest req)
         {
@@ -54,9 +41,6 @@ namespace WebApplication1.Controllers
                 ? NotFound(new { message = $"Queue item {id} not found." })
                 : Ok(item);
         }
-
-        // ─── PATCH /api/v1/admin/queue/:id/complete ───────────────
-        /// <summary>Marks a queue item as completed.</summary>
         [HttpPatch("{id:int}/complete")]
         public IActionResult Complete(int id)
         {
@@ -65,8 +49,6 @@ namespace WebApplication1.Controllers
                 ? NotFound(new { message = $"Queue item {id} not found." })
                 : Ok(item);
         }
-
-        // ─── VALIDATION ───────────────────────────────────────────
         private IActionResult? Validate(QueueItemRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Title))

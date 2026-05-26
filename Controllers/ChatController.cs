@@ -7,14 +7,6 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
-    /// <summary>
-    /// Chat API  —  base route: /chat
-    ///
-    /// POST /chat/message          — Send a message; creates/continues a conversation
-    /// GET  /chat/history/{sid}    — Retrieve message history for a session
-    /// GET  /chat/conversations    — [auth] List all conversations for logged-in user
-    /// DELETE /chat/{sid}          — Delete a conversation (owner or admin)
-    /// </summary>
     [ApiController]
     [Route("chat")]
     public class ChatController : ControllerBase
@@ -32,13 +24,7 @@ namespace WebApplication1.Controllers
             _ai = ai;
             _logger = logger;
         }
-
-        // ─── POST /chat/message ───────────────────────────────────
-        /// <summary>
-        /// Send a message. Works for anonymous and authenticated users.
-        /// Creates a new conversation if session_id is unseen; otherwise appends.
-        /// Returns the AI reply and full conversation history.
-        /// </summary>
+        // Send a message and get an AI response
         [HttpPost("message")]
         public async Task<IActionResult> SendMessage(
             [FromBody] ChatRequest req,
@@ -59,23 +45,23 @@ namespace WebApplication1.Controllers
 
             using var conn = OpenConnection();
 
-            // 1. Upsert conversation
+            // Save or create the conversation
             var conversation = GetOrCreateConversation(conn, req.SessionId, userId);
 
-            // 2. Load existing history
+            // Load previous messages for context
             var history = GetMessages(conn, conversation.Id);
 
-            // 3. Persist the new user message
+            // Store the user message
             var userMsg = PersistMessage(conn, conversation.Id, "user", userMessage);
             history.Add(userMsg);
 
-            // 4. Build AI message list (most recent MaxHistoryForAi turns)
+            // Build message history to send to AI
             var aiMessages = history
                 .TakeLast(MaxHistoryForAi)
                 .Select(m => new AiMessage(m.Role, m.Content))
                 .ToList();
 
-            // 5. Call the AI provider
+            // Get AI response
             string reply;
             try
             {
@@ -87,11 +73,11 @@ namespace WebApplication1.Controllers
                 return StatusCode(503, new { message = "AI service temporarily unavailable." });
             }
 
-            // 6. Persist assistant reply
+            // Store the AI reply
             var assistantMsg = PersistMessage(conn, conversation.Id, "assistant", reply);
             history.Add(assistantMsg);
 
-            // 7. Auto-title the conversation after the first user message
+            // Auto-title on first message
             if (history.Count == 2)
                 UpdateConversationTitle(conn, conversation.Id, Truncate(userMessage, 60));
 
@@ -103,13 +89,7 @@ namespace WebApplication1.Controllers
                 History = history
             });
         }
-
-        // ─── GET /chat/history/{sessionId} ───────────────────────
-        /// <summary>
-        /// Returns message history for a session.
-        /// Anonymous callers can access their own session; authenticated users can
-        /// access any session they own; admins can access everything.
-        /// </summary>
+        // Get the message history for a session
         [HttpGet("history/{sessionId}")]
         public IActionResult GetHistory(string sessionId)
         {
@@ -122,12 +102,7 @@ namespace WebApplication1.Controllers
             var messages = GetMessages(conn, conv.Id);
             return Ok(new { conv.Id, conv.SessionId, conv.Title, conv.CreatedAt, messages });
         }
-
-        // ─── GET /chat/conversations ──────────────────────────────
-        /// <summary>
-        /// [Authenticated] Returns all conversations belonging to the current user.
-        /// Admins see all conversations.
-        /// </summary>
+        // List all conversations for the logged-in user
         [Authorize]
         [HttpGet("conversations")]
         public IActionResult GetConversations()
@@ -148,12 +123,7 @@ namespace WebApplication1.Controllers
             while (reader.Read()) list.Add(MapConversation(reader));
             return Ok(list);
         }
-
-        // ─── DELETE /chat/{sessionId} ─────────────────────────────
-        /// <summary>
-        /// Delete a conversation and all its messages.
-        /// Only the owner or an admin may delete.
-        /// </summary>
+        // Delete a conversation by session ID
         [Authorize]
         [HttpDelete("{sessionId}")]
         public IActionResult DeleteConversation(string sessionId)
@@ -170,8 +140,6 @@ namespace WebApplication1.Controllers
 
             return Ok(new { message = "Conversation deleted." });
         }
-
-        // ─── HELPERS ─────────────────────────────────────────────
 
         private MySqlConnection OpenConnection()
         {
@@ -190,10 +158,9 @@ namespace WebApplication1.Controllers
         {
             if (User.IsInRole("admin")) return true;
             var userId = GetCurrentUserId();
-            // Authenticated owner
+            // Check the user owns this conversation
             if (userId.HasValue && conv.UserId == userId) return true;
-            // Anonymous: allow if conversation has no owner (session-based access is
-            // handled by the client knowing their own session_id)
+            // Allow anonymous access by session ID
             if (!userId.HasValue && conv.UserId == null) return true;
             return false;
         }
